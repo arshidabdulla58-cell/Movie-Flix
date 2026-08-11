@@ -1,283 +1,238 @@
-// ============================================================
-// MOVIEFLIX - TMDB JAVASCRIPT
-// PART 1: CONFIGURATION + API + DOM
-// ============================================================
+/* ============================================================
+   MOVIEFLIX
+   COMPLETE SCRIPT.JS
 
-const API_KEY = "686025cbe0ca0165a1059efee08a15f1";
+   Features:
+   - TMDB API
+   - Home sections
+   - Search
+   - Movie details
+   - Trailer
+   - Favorites
+   - Already Watched
+   - To Be Watched
+   - Account registration
+   - Account login
+   - Profile editing
+   - Reviews CRUD
+   - Watchlist CRUD
+   - LocalStorage persistence
+============================================================ */
 
-const API_BASE = "https://api.themoviedb.org/3";
 
-const IMAGE_BASE =
+/* ============================================================
+   1. TMDB CONFIGURATION
+============================================================ */
+
+/*
+   IMPORTANT:
+   Replace the value below with your NEW TMDB API key.
+
+   Do NOT use the old API key you posted in chat.
+*/
+
+const TMDB_API_KEY = "686025cbe0ca0165a1059efee08a15f1";
+
+const TMDB_BASE_URL =
+    "https://api.themoviedb.org/3";
+
+const TMDB_IMAGE_URL =
     "https://image.tmdb.org/t/p/w500";
 
-const BACKDROP_BASE =
+const TMDB_BACKDROP_URL =
     "https://image.tmdb.org/t/p/original";
 
 
-// ============================================================
-// APP STATE
-// ============================================================
+/* ============================================================
+   2. APPLICATION STATE
+============================================================ */
 
-let currentMovie = null;
-let heroMovie = null;
+const state = {
 
-let myList =
-    JSON.parse(
-        localStorage.getItem("movieflix-list") || "[]"
+    currentPage: "home",
+
+    moviesPage: 1,
+
+    currentMovie: null,
+
+    currentTrailerKey: null,
+
+    currentWatchStatus: "favorite",
+
+    currentReviewRating: 0,
+
+    currentUser: null,
+
+    searchTimeout: null,
+
+    heroMovie: null
+
+};
+
+
+/* ============================================================
+   3. LOCAL STORAGE KEYS
+============================================================ */
+
+const STORAGE_KEYS = {
+
+    users: "movieflix_users",
+
+    currentUser: "movieflix_current_user",
+
+    collections: "movieflix_collections",
+
+    reviews: "movieflix_reviews"
+
+};
+
+
+/* ============================================================
+   4. BASIC HELPERS
+============================================================ */
+
+function getElement(id) {
+
+    return document.getElementById(id);
+
+}
+
+
+function safeJSONParse(value, fallback) {
+
+    try {
+
+        return value
+            ? JSON.parse(value)
+            : fallback;
+
+    } catch (error) {
+
+        console.error(
+            "JSON parse error:",
+            error
+        );
+
+        return fallback;
+
+    }
+
+}
+
+
+function getUsers() {
+
+    return safeJSONParse(
+        localStorage.getItem(
+            STORAGE_KEYS.users
+        ),
+        []
     );
 
+}
 
-// ============================================================
-// DOM ELEMENTS
-// ============================================================
 
-const $ = (selector) =>
-    document.querySelector(selector);
+function saveUsers(users) {
 
-const $$ = (selector) =>
-    document.querySelectorAll(selector);
-
-
-const loadingScreen =
-    $("#loadingScreen");
-
-const hero =
-    $(".hero");
-
-const heroTitle =
-    $("#heroTitle");
-
-const heroDescription =
-    $("#heroDescription");
-
-const heroYear =
-    $("#heroYear");
-
-const heroRating =
-    $("#heroRating");
-
-const heroPlay =
-    $("#heroPlay");
-
-const heroInfo =
-    $("#heroInfo");
-
-
-const trendingMovies =
-    $("#trendingMovies");
-
-const popularMovies =
-    $("#popularMovies");
-
-const topRatedMovies =
-    $("#topRatedMovies");
-
-const actionMovies =
-    $("#actionMovies");
-
-const myListMovies =
-    $("#myListMovies");
-
-const emptyList =
-    $("#emptyList");
-
-
-const movieModal =
-    $("#movieModal");
-
-const modalBackdrop =
-    $("#modalBackdrop");
-
-const modalClose =
-    $("#modalClose");
-
-const modalImage =
-    $("#modalImage");
-
-const modalTitle =
-    $("#modalTitle");
-
-const modalYear =
-    $("#modalYear");
-
-const modalRating =
-    $("#modalRating");
-
-const modalRuntime =
-    $("#modalRuntime");
-
-const modalGenres =
-    $("#modalGenres");
-
-const modalDescription =
-    $("#modalDescription");
-
-const modalTrailer =
-    $("#modalTrailer");
-
-const modalList =
-    $("#modalList");
-
-
-const toast =
-    $("#toast");
-
-
-const searchButton =
-    $("#searchButton");
-
-const searchBox =
-    $("#searchBox");
-
-const searchInput =
-    $("#searchInput");
-
-const closeSearch =
-    $("#closeSearch");
-
-const searchResultsSection =
-    $("#searchResultsSection");
-
-const searchResults =
-    $("#searchResults");
-
-const searchQuery =
-    $("#searchQuery");
-
-
-// ============================================================
-// EXTRA MOVIE CATEGORIES
-// ============================================================
-
-const extraCategories = [
-
-    {
-        id: "comedyMovies",
-
-        title: "Comedy Movies",
-
-        endpoint:
-            "/discover/movie?language=en-US&sort_by=popularity.desc&with_genres=35&page=1"
-    },
-
-    {
-        id: "horrorMovies",
-
-        title: "Horror Movies",
-
-        endpoint:
-            "/discover/movie?language=en-US&sort_by=popularity.desc&with_genres=27&page=1"
-    },
-
-    {
-        id: "scifiMovies",
-
-        title: "Sci-Fi Movies",
-
-        endpoint:
-            "/discover/movie?language=en-US&sort_by=popularity.desc&with_genres=878&page=1"
-    },
-
-    {
-        id: "upcomingMovies",
-
-        title: "Coming Soon",
-
-        endpoint:
-            "/movie/upcoming?language=en-US&page=1"
-    }
-
-];
-
-
-// ============================================================
-// CREATE EXTRA SECTIONS
-// ============================================================
-
-function createExtraSections() {
-
-    if (!myListMovies) {
-        return;
-    }
-
-    if ($("#extraCategories")) {
-        return;
-    }
-
-
-    const wrapper =
-        document.createElement("div");
-
-    wrapper.id =
-        "extraCategories";
-
-
-    extraCategories.forEach(
-        (category) => {
-
-            const section =
-                document.createElement("section");
-
-            section.className =
-                "section";
-
-
-            section.innerHTML = `
-
-                <div class="section-header">
-
-                    <h2>
-
-                        <span class="red-line"></span>
-
-                        ${escapeHTML(
-                            category.title
-                        )}
-
-                    </h2>
-
-                    <button
-                        class="see-all dynamic-see-all"
-                        type="button"
-                        data-target="${category.id}"
-                    >
-
-                        See All
-
-                        <i class="fa-solid fa-chevron-right"></i>
-
-                    </button>
-
-                </div>
-
-
-                <div
-                    class="movie-row"
-                    id="${category.id}"
-                ></div>
-
-            `;
-
-
-            wrapper.appendChild(
-                section
-            );
-
-        }
+    localStorage.setItem(
+        STORAGE_KEYS.users,
+        JSON.stringify(users)
     );
 
+}
 
-    const myListSection =
-        myListMovies.closest(
-            ".section"
+
+function getCollections() {
+
+    return safeJSONParse(
+        localStorage.getItem(
+            STORAGE_KEYS.collections
+        ),
+        {}
+    );
+
+}
+
+
+function saveCollections(collections) {
+
+    localStorage.setItem(
+        STORAGE_KEYS.collections,
+        JSON.stringify(collections)
+    );
+
+}
+
+
+function getReviews() {
+
+    return safeJSONParse(
+        localStorage.getItem(
+            STORAGE_KEYS.reviews
+        ),
+        {}
+    );
+
+}
+
+
+function saveReviews(reviews) {
+
+    localStorage.setItem(
+        STORAGE_KEYS.reviews,
+        JSON.stringify(reviews)
+    );
+
+}
+
+
+/* ============================================================
+   5. CURRENT USER
+============================================================ */
+
+function loadCurrentUser() {
+
+    const email =
+        localStorage.getItem(
+            STORAGE_KEYS.currentUser
+        );
+
+    if (!email) {
+
+        state.currentUser = null;
+
+        return;
+
+    }
+
+
+    const users = getUsers();
+
+    const user =
+        users.find(
+            item =>
+                item.email === email
         );
 
 
-    if (myListSection) {
+    state.currentUser = user || null;
 
-        myListSection.parentNode.insertBefore(
-            wrapper,
-            myListSection
+}
+
+
+function saveCurrentUser() {
+
+    if (state.currentUser) {
+
+        localStorage.setItem(
+            STORAGE_KEYS.currentUser,
+            state.currentUser.email
+        );
+
+    } else {
+
+        localStorage.removeItem(
+            STORAGE_KEYS.currentUser
         );
 
     }
@@ -285,42 +240,373 @@ function createExtraSections() {
 }
 
 
-// ============================================================
-// TMDB API FUNCTION
-// ============================================================
+/* ============================================================
+   6. USER COLLECTION
+============================================================ */
 
-async function fetchAPI(endpoint) {
+function getUserCollection() {
+
+    if (!state.currentUser) {
+
+        return {
+
+            favorite: [],
+
+            watched: [],
+
+            towatch: []
+
+        };
+
+    }
+
+
+    const collections =
+        getCollections();
+
+
+    if (!collections[state.currentUser.email]) {
+
+        collections[state.currentUser.email] = {
+
+            favorite: [],
+
+            watched: [],
+
+            towatch: []
+
+        };
+
+        saveCollections(collections);
+
+    }
+
+
+    return collections[
+        state.currentUser.email
+    ];
+
+}
+
+
+function saveUserCollection(collection) {
+
+    if (!state.currentUser) {
+
+        return;
+
+    }
+
+
+    const collections =
+        getCollections();
+
+
+    collections[
+        state.currentUser.email
+    ] = collection;
+
+
+    saveCollections(collections);
+
+}
+
+
+/* ============================================================
+   7. MOVIE ID HELPERS
+============================================================ */
+
+function movieIsInCollection(
+    movieId,
+    status
+) {
+
+    const collection =
+        getUserCollection();
+
+
+    return collection[
+        status
+    ].some(
+        movie =>
+            Number(movie.id) ===
+            Number(movieId)
+    );
+
+}
+
+
+function getMovieStatus(movieId) {
+
+    const collection =
+        getUserCollection();
+
 
     if (
-        !API_KEY ||
-        API_KEY ===
-            "PASTE_YOUR_TMDB_API_KEY_HERE"
+        collection.favorite.some(
+            movie =>
+                Number(movie.id) ===
+                Number(movieId)
+        )
     ) {
 
-        throw new Error(
-            "TMDB API key is missing."
+        return "favorite";
+
+    }
+
+
+    if (
+        collection.watched.some(
+            movie =>
+                Number(movie.id) ===
+                Number(movieId)
+        )
+    ) {
+
+        return "watched";
+
+    }
+
+
+    if (
+        collection.towatch.some(
+            movie =>
+                Number(movie.id) ===
+                Number(movieId)
+        )
+    ) {
+
+        return "towatch";
+
+    }
+
+
+    return null;
+
+}
+
+
+/* ============================================================
+   8. ADD MOVIE TO COLLECTION
+============================================================ */
+
+/* ============================================================
+   8. ADD MOVIE TO COLLECTION
+============================================================ */
+
+function addMovieToCollection(
+    movie,
+    status
+) {
+
+    if (!state.currentUser) {
+
+        showToast(
+            "Please sign in first."
+        );
+
+        openAccountModal();
+
+        return false;
+
+    }
+
+
+    const collection =
+        getUserCollection();
+
+
+    /*
+       IMPORTANT:
+       Each collection is completely independent.
+
+       A movie can now exist in:
+       ❤️ favorite
+       ✅ watched
+       ⏰ towatch
+
+       at the same time.
+
+       We ONLY add the movie to the selected
+       collection and DO NOT remove it from
+       the other collections.
+    */
+
+
+    if (
+        !collection[status]
+    ) {
+
+        collection[status] = [];
+
+    }
+
+
+    const alreadyExists =
+        collection[status].some(
+            item =>
+                Number(item.id) ===
+                Number(movie.id)
+        );
+
+
+    if (!alreadyExists) {
+
+        collection[status].push(
+            cleanMovieForStorage(movie)
         );
 
     }
 
 
-    const separator =
-        endpoint.includes("?")
-            ? "&"
-            : "?";
+    saveUserCollection(
+        collection
+    );
+
+
+    updateWatchlistCounts();
+
+
+    return true;
+
+}
+
+
+
+/* ============================================================
+   9. REMOVE MOVIE FROM COLLECTION
+============================================================ */
+
+function removeMovieFromCollection(
+    movieId,
+    status
+) {
+
+    if (!state.currentUser) {
+
+        return;
+
+    }
+
+
+    const collection =
+        getUserCollection();
+
+
+    collection[
+        status
+    ] =
+        collection[
+            status
+        ].filter(
+            movie =>
+                Number(movie.id) !==
+                Number(movieId)
+        );
+
+
+    saveUserCollection(
+        collection
+    );
+
+
+    updateWatchlistCounts();
+
+}
+
+
+/* ============================================================
+   10. CLEAN MOVIE OBJECT
+============================================================ */
+
+function cleanMovieForStorage(movie) {
+
+    return {
+
+        id: movie.id,
+
+        title:
+            movie.title ||
+            movie.name ||
+            "Unknown Movie",
+
+        poster_path:
+            movie.poster_path ||
+            null,
+
+        backdrop_path:
+            movie.backdrop_path ||
+            null,
+
+        overview:
+            movie.overview ||
+            "",
+
+        release_date:
+            movie.release_date ||
+            movie.first_air_date ||
+            "",
+
+        vote_average:
+            Number(
+                movie.vote_average || 0
+            ),
+
+        genre_ids:
+            Array.isArray(
+                movie.genre_ids
+            )
+                ? movie.genre_ids
+                : [],
+
+        genres:
+            Array.isArray(movie.genres)
+                ? movie.genres
+                : []
+
+    };
+
+}
+
+
+/* ============================================================
+   11. TMDB API REQUEST
+============================================================ */
+
+async function tmdbFetch(
+    endpoint,
+    params = {}
+) {
+
+    if (
+        !TMDB_API_KEY ||
+        TMDB_API_KEY ===
+            "YOUR_NEW_TMDB_API_KEY"
+    ) {
+
+        throw new Error(
+            "Please add your new TMDB API key in script.js."
+        );
+
+    }
+
+
+    const query =
+        new URLSearchParams({
+
+            api_key:
+                TMDB_API_KEY,
+
+            language:
+                "en-US",
+
+            ...params
+
+        });
 
 
     const url =
-        `${API_BASE}${endpoint}` +
-        `${separator}api_key=${encodeURIComponent(
-            API_KEY
-        )}`;
-
-
-    console.log(
-        "🌐 TMDB:",
-        endpoint
-    );
+        `${TMDB_BASE_URL}${endpoint}?${query}`;
 
 
     const response =
@@ -339,9 +625,7 @@ async function fetchAPI(endpoint) {
                 await response.json();
 
 
-            if (
-                errorData.status_message
-            ) {
+            if (errorData.status_message) {
 
                 message =
                     errorData.status_message;
@@ -350,14 +634,12 @@ async function fetchAPI(endpoint) {
 
         } catch (error) {
 
-            // Ignore JSON parsing errors.
+            // Ignore JSON parsing error.
 
         }
 
 
-        throw new Error(
-            message
-        );
+        throw new Error(message);
 
     }
 
@@ -365,497 +647,1093 @@ async function fetchAPI(endpoint) {
     return response.json();
 
 }
-// ============================================================
-// PART 2: LOAD MOVIES
-// ============================================================
 
-async function loadMovies() {
 
-    console.log(
-        "🎬 MovieFlix starting..."
+/* ============================================================
+   12. IMAGE URL
+============================================================ */
+
+function getPosterUrl(
+    posterPath
+) {
+
+    if (!posterPath) {
+
+        return "";
+
+    }
+
+
+    if (
+        posterPath.startsWith("http")
+    ) {
+
+        return posterPath;
+
+    }
+
+
+    return (
+        TMDB_IMAGE_URL +
+        posterPath
+    );
+
+}
+
+
+/* ============================================================
+   13. ESCAPE HTML
+============================================================ */
+
+function escapeHTML(value) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
+
+        return "";
+
+    }
+
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+}
+
+
+/* ============================================================
+   14. FORMAT DATE
+============================================================ */
+
+function formatDate(dateString) {
+
+    if (!dateString) {
+
+        return "Unknown";
+
+    }
+
+
+    const date =
+        new Date(dateString);
+
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+
+        return "Unknown";
+
+    }
+
+
+    return date.toLocaleDateString(
+        "en-US",
+        {
+            year: "numeric",
+            month: "short",
+            day: "numeric"
+        }
+    );
+
+}
+
+
+/* ============================================================
+   15. GET YEAR
+============================================================ */
+
+function getMovieYear(movie) {
+
+    const date =
+        movie.release_date ||
+        movie.first_air_date;
+
+
+    return date
+        ? date.substring(0, 4)
+        : "N/A";
+
+}
+
+
+/* ============================================================
+   16. SHOW TOAST
+============================================================ */
+
+let toastTimer = null;
+
+
+function showToast(message) {
+
+    const toast =
+        getElement("toast");
+
+
+    const messageElement =
+        getElement("toastMessage");
+
+
+    if (!toast || !messageElement) {
+
+        return;
+
+    }
+
+
+    messageElement.textContent =
+        message;
+
+
+    toast.classList.add("show");
+
+
+    clearTimeout(toastTimer);
+
+
+    toastTimer =
+        setTimeout(
+            () => {
+
+                toast.classList.remove(
+                    "show"
+                );
+
+            },
+            2800
+        );
+
+}
+
+
+/* ============================================================
+   17. LOADING SCREEN
+============================================================ */
+
+function hideLoadingScreen() {
+
+    const loading =
+        getElement("loadingScreen");
+
+
+    if (loading) {
+
+        loading.classList.add(
+            "hidden"
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   18. INITIALIZE APPLICATION
+============================================================ */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    initializeApp
+);
+
+
+async function initializeApp() {
+
+    loadCurrentUser();
+
+    setupNavigation();
+
+    setupSearch();
+
+    setupMovieModal();
+
+    setupAccountModal();
+
+    setupWatchlist();
+
+    setupPagination();
+
+    setupFilters();
+
+    setupHeroButtons();
+
+    setupMobileMenu();
+
+    updateAccountUI();
+
+    updateWatchlistCounts();
+
+
+    await loadHomePage();
+
+
+    hideLoadingScreen();
+
+}
+
+
+/* ============================================================
+   19. NAVIGATION
+============================================================ */
+
+function setupNavigation() {
+
+    document
+        .querySelectorAll(
+            "[data-page]"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        const page =
+                            button.dataset.page;
+
+
+                        navigateTo(
+                            page
+                        );
+
+
+                        getElement(
+                            "mobileMenu"
+                        )?.classList.remove(
+                            "active"
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    getElement(
+        "logoButton"
+    )?.addEventListener(
+        "click",
+        () => {
+
+            navigateTo("home");
+
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
+
+        }
     );
 
 
-    createExtraSections();
+    getElement(
+        "browseMoviesButton"
+    )?.addEventListener(
+        "click",
+        () => {
+
+            navigateTo("movies");
+
+        }
+    );
+
+}
+
+
+/* ============================================================
+   20. NAVIGATE
+============================================================ */
+
+async function navigateTo(page) {
+
+    state.currentPage =
+        page;
+
+
+    document
+        .querySelectorAll(
+            ".page"
+        )
+        .forEach(
+            section => {
+
+                section.classList.remove(
+                    "active-page"
+                );
+
+            }
+        );
+
+
+    const target =
+        getElement(
+            `${page}Page`
+        );
+
+
+    if (target) {
+
+        target.classList.add(
+            "active-page"
+        );
+
+    }
+
+
+    document
+        .querySelectorAll(
+            ".nav-link"
+        )
+        .forEach(
+            button => {
+
+                button.classList.toggle(
+                    "active",
+                    button.dataset.page ===
+                        page
+                );
+
+            }
+        );
+
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+
+
+    if (
+        page === "movies" &&
+        !state.moviesLoaded
+    ) {
+
+        await loadMoviesPage();
+
+    }
+
+
+    if (page === "watchlist") {
+
+        renderWatchlist();
+
+    }
+
+}
+
+
+/* ============================================================
+   21. MOBILE MENU
+============================================================ */
+
+function setupMobileMenu() {
+
+    const button =
+        getElement(
+            "mobileMenuButton"
+        );
+
+
+    const menu =
+        getElement(
+            "mobileMenu"
+        );
+
+
+    button?.addEventListener(
+        "click",
+        () => {
+
+            menu?.classList.toggle(
+                "active"
+            );
+
+        }
+    );
+
+
+    getElement(
+        "mobileAccountButton"
+    )?.addEventListener(
+        "click",
+        () => {
+
+            menu?.classList.remove(
+                "active"
+            );
+
+            openAccountModal();
+
+        }
+    );
+
+}
+
+
+/* ============================================================
+   22. HOME PAGE
+============================================================ */
+
+async function loadHomePage() {
+
+    try {
+
+        const results =
+            await Promise.allSettled([
+
+                loadTrending(),
+
+                loadPopular(),
+
+                loadTopRated(),
+
+                loadGenreMovies(
+                    "actionMovies",
+                    28
+                ),
+
+                loadGenreMovies(
+                    "comedyMovies",
+                    35
+                ),
+
+                loadGenreMovies(
+                    "horrorMovies",
+                    27
+                ),
+
+                loadGenreMovies(
+                    "scifiMovies",
+                    878
+                )
+
+            ]);
+
+
+        const successful =
+            results.filter(
+                result =>
+                    result.status ===
+                    "fulfilled"
+            );
+
+
+        if (
+            successful.length === 0
+        ) {
+
+            showToast(
+                "Unable to load movies. Check your TMDB API key."
+            );
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Home page error:",
+            error
+        );
+
+        showToast(
+            "Unable to load movies."
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   23. TRENDING
+============================================================ */
+
+async function loadTrending() {
+
+    const data =
+        await tmdbFetch(
+            "/trending/movie/week"
+        );
+
+
+    const movies =
+        data.results || [];
+
+
+    renderMovieRow(
+        "trendingMovies",
+        movies.slice(0, 10)
+    );
+
+
+    if (movies.length > 0) {
+
+        state.heroMovie =
+            movies[0];
+
+        updateHero(
+            movies[0]
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   24. POPULAR
+============================================================ */
+
+async function loadPopular() {
+
+    const data =
+        await tmdbFetch(
+            "/movie/popular",
+            {
+                page: 1
+            }
+        );
+
+
+    renderMovieRow(
+        "popularMovies",
+        data.results?.slice(
+            0,
+            10
+        ) || []
+    );
+
+}
+
+
+/* ============================================================
+   25. TOP RATED
+============================================================ */
+
+async function loadTopRated() {
+
+    const data =
+        await tmdbFetch(
+            "/movie/top_rated",
+            {
+                page: 1
+            }
+        );
+
+
+    renderMovieRow(
+        "topRatedMovies",
+        data.results?.slice(
+            0,
+            10
+        ) || []
+    );
+
+}
+
+
+/* ============================================================
+   26. GENRE MOVIES
+============================================================ */
+
+async function loadGenreMovies(
+    containerId,
+    genreId
+) {
+
+    const data =
+        await tmdbFetch(
+            "/discover/movie",
+            {
+
+                with_genres:
+                    genreId,
+
+                sort_by:
+                    "popularity.desc",
+
+                page: 1
+
+            }
+        );
+
+
+    renderMovieRow(
+        containerId,
+        data.results?.slice(
+            0,
+            10
+        ) || []
+    );
+
+}
+
+
+/* ============================================================
+   27. RENDER MOVIE ROW
+============================================================ */
+
+function renderMovieRow(
+    containerId,
+    movies
+) {
+
+    const container =
+        getElement(
+            containerId
+        );
+
+
+    if (!container) {
+
+        return;
+
+    }
+
+
+    if (!movies.length) {
+
+        container.innerHTML =
+            `<p class="loading-message">
+                No movies found.
+             </p>`;
+
+        return;
+
+    }
+
+
+    container.innerHTML =
+        movies
+            .map(
+                movie =>
+                    createMovieCard(
+                        movie
+                    )
+            )
+            .join("");
+
+
+    attachMovieCardEvents(
+        container
+    );
+
+}
+
+
+/* ============================================================
+   28. MOVIE CARD HTML
+============================================================ */
+
+function createMovieCard(
+    movie
+) {
+
+    const title =
+        movie.title ||
+        movie.name ||
+        "Unknown Movie";
+
+
+    const year =
+        getMovieYear(
+            movie
+        );
+
+
+    const rating =
+        Number(
+            movie.vote_average || 0
+        ).toFixed(1);
+
+
+    const poster =
+        getPosterUrl(
+            movie.poster_path
+        );
+
+
+    const status =
+        getMovieStatus(
+            movie.id
+        );
+
+
+    const favoriteBadge =
+        status === "favorite"
+            ? `
+                <span
+                    class="movie-badge favorite"
+                >
+                    <i class="fa-solid fa-heart"></i>
+                </span>
+              `
+            : "";
+
+
+    const imageHTML =
+        poster
+            ? `
+                <img
+                    src="${poster}"
+                    alt="${escapeHTML(title)}"
+                    loading="lazy"
+                    onerror="this.style.display='none'"
+                >
+              `
+            : `
+                <div
+                    style="
+                        width:100%;
+                        height:100%;
+                        display:grid;
+                        place-items:center;
+                        color:#777;
+                        background:#222;
+                    "
+                >
+                    <i
+                        class="fa-solid fa-film"
+                        style="font-size:30px;"
+                    ></i>
+                </div>
+              `;
+
+
+    return `
+
+        <article
+            class="movie-card"
+            data-movie-id="${movie.id}"
+        >
+
+            <div class="movie-poster">
+
+                ${imageHTML}
+
+
+                <div class="movie-card-badges">
+
+                    ${favoriteBadge}
+
+                </div>
+
+
+                <div class="movie-overlay">
+
+                    <button
+                        class="movie-info-button"
+                        type="button"
+                        data-info-id="${movie.id}"
+                    >
+
+                        <i
+                            class="fa-solid fa-circle-info"
+                        ></i>
+
+                        More Info
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div class="movie-card-body">
+
+                <div
+                    class="movie-title"
+                    title="${escapeHTML(title)}"
+                >
+                    ${escapeHTML(title)}
+                </div>
+
+
+                <div class="movie-meta">
+
+                    <span>
+                        ${year}
+                    </span>
+
+
+                    <span class="movie-rating">
+
+                        <i
+                            class="fa-solid fa-star"
+                        ></i>
+
+                        ${rating}
+
+                    </span>
+
+                </div>
+
+            </div>
+
+        </article>
+
+    `;
+
+}
+
+
+/* ============================================================
+   29. ATTACH CARD EVENTS
+============================================================ */
+
+function attachMovieCardEvents(
+    container
+) {
+
+    container
+        .querySelectorAll(
+            ".movie-card"
+        )
+        .forEach(
+            card => {
+
+                card.addEventListener(
+                    "click",
+                    event => {
+
+                        if (
+                            event.target.closest(
+                                ".movie-info-button"
+                            )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const id =
+                            card.dataset.movieId;
+
+
+                        openMovieDetails(
+                            id
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    container
+        .querySelectorAll(
+            ".movie-info-button"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    event => {
+
+                        event.stopPropagation();
+
+
+                        openMovieDetails(
+                            button.dataset.infoId
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+}
+
+
+/* ============================================================
+   30. MOVIE DETAILS
+============================================================ */
+
+async function openMovieDetails(
+    movieId
+) {
+
+    const modal =
+        getElement(
+            "movieModal"
+        );
+
+
+    const details =
+        getElement(
+            "movieDetails"
+        );
+
+
+    if (!modal || !details) {
+
+        return;
+
+    }
+
+
+    modal.classList.add(
+        "active"
+    );
+
+
+    document.body.style.overflow =
+        "hidden";
+
+
+    details.innerHTML = `
+
+        <div class="loading-message">
+
+            <div class="loader"></div>
+
+            <p>
+                Loading movie details...
+            </p>
+
+        </div>
+
+    `;
 
 
     try {
 
-        const requests = [
-
-            // Trending
-            fetchAPI(
-                "/trending/movie/week?language=en-US"
-            ),
-
-            // Popular
-            fetchAPI(
-                "/movie/popular?language=en-US&page=1"
-            ),
-
-            // Top Rated
-            fetchAPI(
-                "/movie/top_rated?language=en-US&page=1"
-            ),
-
-            // Action
-            fetchAPI(
-                "/discover/movie?language=en-US&sort_by=popularity.desc&with_genres=28&page=1"
-            )
-
-        ];
-
-
-        const results =
-            await Promise.allSettled(
-                requests
+        const movie =
+            await tmdbFetch(
+                `/movie/${movieId}`,
+                {
+                    append_to_response:
+                        "videos"
+                }
             );
 
 
-        const [
-            trending,
-            popular,
-            topRated,
-            action
-        ] = results;
+        state.currentMovie =
+            movie;
 
 
-        // ====================================================
-        // TRENDING
-        // ====================================================
-
-        if (
-            trending.status ===
-            "fulfilled"
-        ) {
-
-            renderMovies(
-                trending.value.results,
-                trendingMovies
+        const trailer =
+            findTrailer(
+                movie.videos?.results || []
             );
 
 
-            setupHero(
-                trending.value.results
-            );
-
-        } else {
-
-            showSectionError(
-                trendingMovies
-            );
-
-            console.error(
-                trending.reason
-            );
-
-        }
+        state.currentTrailerKey =
+            trailer?.key || null;
 
 
-        // ====================================================
-        // POPULAR
-        // ====================================================
-
-        if (
-            popular.status ===
-            "fulfilled"
-        ) {
-
-            renderMovies(
-                popular.value.results,
-                popularMovies
-            );
-
-        } else {
-
-            showSectionError(
-                popularMovies
-            );
-
-            console.error(
-                popular.reason
-            );
-
-        }
-
-
-        // ====================================================
-        // TOP RATED
-        // ====================================================
-
-        if (
-            topRated.status ===
-            "fulfilled"
-        ) {
-
-            renderMovies(
-                topRated.value.results,
-                topRatedMovies
-            );
-
-        } else {
-
-            showSectionError(
-                topRatedMovies
-            );
-
-            console.error(
-                topRated.reason
-            );
-
-        }
-
-
-        // ====================================================
-        // ACTION
-        // ====================================================
-
-        if (
-            action.status ===
-            "fulfilled"
-        ) {
-
-            renderMovies(
-                action.value.results,
-                actionMovies
-            );
-
-        } else {
-
-            showSectionError(
-                actionMovies
-            );
-
-            console.error(
-                action.reason
-            );
-
-        }
-
-
-        // ====================================================
-        // EXTRA CATEGORIES
-        // ====================================================
-
-        await loadExtraCategories();
-
-
-        // ====================================================
-        // MY LIST
-        // ====================================================
-
-        renderMyList();
-
-
-        console.log(
-            "✅ MovieFlix loaded successfully."
+        renderMovieDetails(
+            movie,
+            trailer
         );
 
 
     } catch (error) {
 
         console.error(
-            "❌ MovieFlix error:",
+            "Movie details error:",
             error
         );
 
 
-        showToast(
-            error.message ||
-            "Something went wrong."
-        );
+        details.innerHTML = `
 
-    } finally {
+            <div class="loading-message">
 
-        hideLoading();
+                <i
+                    class="fa-solid fa-triangle-exclamation"
+                    style="font-size:35px;color:#e50914;"
+                ></i>
 
-    }
+                <p>
+                    Unable to load movie information.
+                </p>
 
-}
+                <button
+                    class="secondary-button"
+                    type="button"
+                    onclick="closeMovieModal()"
+                >
+                    Close
+                </button>
 
+            </div>
 
-// ============================================================
-// LOAD EXTRA CATEGORIES
-// ============================================================
-
-async function loadExtraCategories() {
-
-    const jobs =
-        extraCategories.map(
-            async (category) => {
-
-                const container =
-                    document.getElementById(
-                        category.id
-                    );
-
-
-                if (!container) {
-                    return;
-                }
-
-
-                try {
-
-                    const data =
-                        await fetchAPI(
-                            category.endpoint
-                        );
-
-
-                    renderMovies(
-                        data.results || [],
-                        container
-                    );
-
-
-                } catch (error) {
-
-                    console.error(
-                        `❌ ${category.title}:`,
-                        error
-                    );
-
-
-                    showSectionError(
-                        container
-                    );
-
-                }
-
-            }
-        );
-
-
-    await Promise.allSettled(
-        jobs
-    );
-
-}
-// ============================================================
-// PART 3: HERO SECTION
-// ============================================================
-
-function setupHero(movies) {
-
-    if (
-        !hero ||
-        !movies ||
-        !movies.length
-    ) {
-
-        return;
-    }
-
-
-    heroMovie =
-
-        movies.find(
-            (movie) =>
-                movie.backdrop_path &&
-                Number(
-                    movie.vote_average || 0
-                ) >= 7
-        )
-
-        ||
-
-        movies.find(
-            (movie) =>
-                movie.backdrop_path
-        )
-
-        ||
-
-        movies[0];
-
-
-    if (!heroMovie) {
-        return;
-    }
-
-
-    // ========================================================
-    // BACKGROUND
-    // ========================================================
-
-    if (
-        heroMovie.backdrop_path
-    ) {
-
-        hero.style.backgroundImage =
-            `url("${BACKDROP_BASE}${heroMovie.backdrop_path}")`;
-
-    }
-
-
-    // ========================================================
-    // TITLE
-    // ========================================================
-
-    if (heroTitle) {
-
-        heroTitle.textContent =
-            heroMovie.title ||
-            "MovieFlix";
-
-    }
-
-
-    // ========================================================
-    // DESCRIPTION
-    // ========================================================
-
-    if (heroDescription) {
-
-        heroDescription.textContent =
-            heroMovie.overview ||
-            "Discover your next favorite movie.";
-
-    }
-
-
-    // ========================================================
-    // YEAR
-    // ========================================================
-
-    if (heroYear) {
-
-        heroYear.textContent =
-            getYear(
-                heroMovie.release_date
-            );
-
-    }
-
-
-    // ========================================================
-    // RATING
-    // ========================================================
-
-    if (heroRating) {
-
-        heroRating.textContent =
-            `⭐ ${formatRating(
-                heroMovie.vote_average
-            )}`;
+        `;
 
     }
 
 }
 
 
-// ============================================================
-// HERO PLAY BUTTON
-// ============================================================
+/* ============================================================
+   31. FIND TRAILER
+============================================================ */
 
-if (heroPlay) {
-
-    heroPlay.addEventListener(
-        "click",
-        () => {
-
-            if (heroMovie) {
-
-                openMovie(
-                    heroMovie.id
-                );
-
-            }
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// HERO MORE INFO BUTTON
-// ============================================================
-
-if (heroInfo) {
-
-    heroInfo.addEventListener(
-        "click",
-        () => {
-
-            if (heroMovie) {
-
-                openMovie(
-                    heroMovie.id
-                );
-
-            }
-
-        }
-    );
-
-}
-// ============================================================
-// PART 4: MOVIE CARDS
-// ============================================================
-
-function renderMovies(
-    movies,
-    container
+function findTrailer(
+    videos
 ) {
 
-    if (!container) {
-        return;
+    if (!Array.isArray(videos)) {
+
+        return null;
+
     }
 
 
-    container.innerHTML =
-        "";
+    return (
+        videos.find(
+            video =>
+                video.site === "YouTube" &&
+                video.type === "Trailer" &&
+                video.official === true
+        ) ||
 
+        videos.find(
+            video =>
+                video.site === "YouTube" &&
+                video.type === "Trailer"
+        ) ||
 
-    const validMovies =
-        (movies || []).filter(
-            (movie) =>
-                movie &&
-                movie.poster_path
-        );
+        videos.find(
+            video =>
+                video.site === "YouTube"
+        ) ||
 
-
-    if (
-        !validMovies.length
-    ) {
-
-        showSectionError(
-            container
-        );
-
-        return;
-    }
-
-
-    validMovies.forEach(
-        (movie) => {
-
-            container.appendChild(
-                createMovieCard(movie)
-            );
-
-        }
+        null
     );
 
 }
 
 
-// ============================================================
-// CREATE ONE MOVIE CARD
-// ============================================================
+/* ============================================================
+   32. RENDER MOVIE DETAILS
+============================================================ */
 
-function createMovieCard(movie) {
+function renderMovieDetails(
+    movie,
+    trailer
+) {
 
-    const card =
-        document.createElement(
-            "article"
+    const details =
+        getElement(
+            "movieDetails"
         );
-
-
-    card.className =
-        "movie-card";
 
 
     const title =
@@ -864,354 +1742,523 @@ function createMovieCard(movie) {
         "Unknown Movie";
 
 
-    const inList =
-        isInMyList(
-            movie.id
+    const poster =
+        getPosterUrl(
+            movie.poster_path
         );
 
 
-    card.innerHTML = `
-
-        <img
-            src="${IMAGE_BASE}${movie.poster_path}"
-            alt="${escapeHTML(title)}"
-            loading="lazy"
-        >
+    const rating =
+        Number(
+            movie.vote_average || 0
+        ).toFixed(1);
 
 
-        <button
-            class="add-list"
-            type="button"
-            aria-label="${
-                inList
-                    ? "Remove from My List"
-                    : "Add to My List"
-            }"
-            title="${
-                inList
-                    ? "Remove from My List"
-                    : "Add to My List"
-            }"
-        >
-
-            <i class="fa-solid ${
-                inList
-                    ? "fa-check"
-                    : "fa-plus"
-            }"></i>
-
-        </button>
+    const runtime =
+        movie.runtime
+            ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m`
+            : "N/A";
 
 
-        <div class="movie-info">
-
-            <div class="movie-title">
-
-                ${escapeHTML(title)}
-
-            </div>
+    const genres =
+        movie.genres || [];
 
 
-            <div class="movie-year">
-
-                ${escapeHTML(
-                    getYear(
-                        movie.release_date
-                    )
-                )}
-
-            </div>
+    const favorite =
+        movieIsInCollection(
+            movie.id,
+            "favorite"
+        );
 
 
-            <div class="movie-rating">
+    const watched =
+        movieIsInCollection(
+            movie.id,
+            "watched"
+        );
 
-                ⭐ ${
-                    formatRating(
-                        movie.vote_average
-                    )
-                }
+
+    const towatch =
+        movieIsInCollection(
+            movie.id,
+            "towatch"
+        );
+
+
+    details.innerHTML = `
+
+        <div class="movie-details-top">
+
+            <img
+                class="details-poster"
+                src="${poster}"
+                alt="${escapeHTML(title)}"
+                onerror="this.style.display='none'"
+            >
+
+
+            <div class="details-content">
+
+                <h2>
+                    ${escapeHTML(title)}
+                </h2>
+
+
+                <div class="details-meta">
+
+                    <span>
+                        ${getMovieYear(movie)}
+                    </span>
+
+                    <span>•</span>
+
+                    <span>
+                        ${runtime}
+                    </span>
+
+                    <span>•</span>
+
+                    <span class="details-rating">
+
+                        <i
+                            class="fa-solid fa-star"
+                        ></i>
+
+                        ${rating}
+
+                    </span>
+
+                </div>
+
+
+                <div class="genre-list">
+
+                    ${genres
+                        .map(
+                            genre =>
+                                `
+                                <span
+                                    class="genre-tag"
+                                >
+                                    ${escapeHTML(
+                                        genre.name
+                                    )}
+                                </span>
+                                `
+                        )
+                        .join("")}
+
+                </div>
+
+
+                <p class="details-overview">
+
+                    ${
+                        escapeHTML(
+                            movie.overview ||
+                            "No description available."
+                        )
+                    }
+
+                </p>
+
+
+                <div class="details-actions">
+
+                    <button
+                        class="details-action ${
+                            favorite
+                                ? "active"
+                                : ""
+                        }"
+                        type="button"
+                        id="detailFavoriteButton"
+                    >
+
+                        <i
+                            class="fa-solid fa-heart"
+                        ></i>
+
+                        ${
+                            favorite
+                                ? "Favorited"
+                                : "Favorite"
+                        }
+
+                    </button>
+
+
+                    <button
+                        class="details-action ${
+                            watched
+                                ? "active"
+                                : ""
+                        }"
+                        type="button"
+                        id="detailWatchedButton"
+                    >
+
+                        <i
+                            class="fa-solid fa-circle-check"
+                        ></i>
+
+                        ${
+                            watched
+                                ? "Watched"
+                                : "Already Watched"
+                        }
+
+                    </button>
+
+
+                    <button
+                        class="details-action ${
+                            towatch
+                                ? "active"
+                                : ""
+                        }"
+                        type="button"
+                        id="detailTowatchButton"
+                    >
+
+                        <i
+                            class="fa-solid fa-clock"
+                        ></i>
+
+                        ${
+                            towatch
+                                ? "In To Watch"
+                                : "To Be Watched"
+                        }
+
+                    </button>
+
+                </div>
 
             </div>
 
         </div>
 
+
+        ${
+            trailer
+                ? `
+
+                    <div class="trailer-section">
+
+                        <h3>
+                            Trailer
+                        </h3>
+
+
+                        <iframe
+                            class="trailer-frame"
+                            src="https://www.youtube.com/embed/${trailer.key}"
+                            title="${escapeHTML(title)} trailer"
+                            allow="
+                                accelerometer;
+                                autoplay;
+                                clipboard-write;
+                                encrypted-media;
+                                gyroscope;
+                                picture-in-picture;
+                                web-share
+                            "
+                            allowfullscreen
+                        ></iframe>
+
+                    </div>
+
+                  `
+                : `
+                    <div class="trailer-section">
+
+                        <h3>
+                            Trailer
+                        </h3>
+
+                        <p
+                            style="
+                                color:#888;
+                                padding:20px 0;
+                            "
+                        >
+                            No trailer is available
+                            for this movie.
+                        </p>
+
+                    </div>
+                  `
+        }
+
+
+        <section class="reviews-section">
+
+            <h3>
+                Community Reviews
+            </h3>
+
+
+            <div
+                class="review-form-container"
+                id="reviewFormContainer"
+            ></div>
+
+
+            <div
+                class="reviews-list"
+                id="reviewsList"
+            ></div>
+
+        </section>
+
     `;
 
 
-    // ========================================================
-    // OPEN DETAILS
-    // ========================================================
+    setupDetailButtons();
 
-    card.addEventListener(
-        "click",
-        (event) => {
+    renderReviewForm();
 
-            if (
-                event.target.closest(
-                    ".add-list"
-                )
-            ) {
-
-                return;
-
-            }
-
-
-            openMovie(
-                movie.id
-            );
-
-        }
+    renderReviews(
+        movie.id
     );
-
-
-    // ========================================================
-    // MY LIST BUTTON
-    // ========================================================
-
-    const listButton =
-        card.querySelector(
-            ".add-list"
-        );
-
-
-    listButton.addEventListener(
-        "click",
-        (event) => {
-
-            event.stopPropagation();
-
-
-            toggleMyList(
-                movie
-            );
-
-        }
-    );
-
-
-    return card;
 
 }
-// ============================================================
-// PART 5: MOVIE DETAILS
-// ============================================================
 
-async function openMovie(
-    movieId
+
+/* ============================================================
+   33. DETAIL BUTTONS
+============================================================ */
+
+function setupDetailButtons() {
+
+    getElement(
+        "detailFavoriteButton"
+    )?.addEventListener(
+        "click",
+        () => {
+
+            toggleMovieStatus(
+                "favorite"
+            );
+
+        }
+    );
+
+
+    getElement(
+        "detailWatchedButton"
+    )?.addEventListener(
+        "click",
+        () => {
+
+            toggleMovieStatus(
+                "watched"
+            );
+
+        }
+    );
+
+
+    getElement(
+        "detailTowatchButton"
+    )?.addEventListener(
+        "click",
+        () => {
+
+            toggleMovieStatus(
+                "towatch"
+            );
+
+        }
+    );
+
+}
+
+
+/* ============================================================
+   34. TOGGLE MOVIE STATUS
+============================================================ */
+
+function toggleMovieStatus(
+    status
 ) {
 
-    if (!movieId) {
+    if (!state.currentMovie) {
+
         return;
+
     }
 
 
-    try {
+    if (!state.currentUser) {
 
         showToast(
-            "Loading movie details..."
+            "Please sign in first."
+        );
+
+        openAccountModal();
+
+        return;
+
+    }
+
+
+    const movie =
+        state.currentMovie;
+
+
+    if (
+        movieIsInCollection(
+            movie.id,
+            status
+        )
+    ) {
+
+        removeMovieFromCollection(
+            movie.id,
+            status
         );
 
 
-        const movie =
-            await fetchAPI(
-                `/movie/${movieId}?language=en-US&append_to_response=credits,videos`
-            );
+        showToast(
+            `Removed from ${
+                getStatusLabel(status)
+            }.`
+        );
+
+    } else {
+
+        addMovieToCollection(
+            movie,
+            status
+        );
 
 
-        currentMovie =
-            movie;
+        showToast(
+            `Added to ${
+                getStatusLabel(status)
+            }.`
+        );
+
+    }
 
 
-        // ====================================================
-        // TITLE
-        // ====================================================
-
-        if (modalTitle) {
-
-            modalTitle.textContent =
-                movie.title ||
-                "Unknown Movie";
-
-        }
-
-
-        // ====================================================
-        // YEAR
-        // ====================================================
-
-        if (modalYear) {
-
-            modalYear.textContent =
-                getYear(
-                    movie.release_date
-                );
-
-        }
-
-
-        // ====================================================
-        // RATING
-        // ====================================================
-
-        if (modalRating) {
-
-            modalRating.textContent =
-                `⭐ ${formatRating(
-                    movie.vote_average
-                )}`;
-
-        }
-
-
-        // ====================================================
-        // RUNTIME
-        // ====================================================
-
-        if (modalRuntime) {
-
-            modalRuntime.textContent =
-                movie.runtime
-                    ? `${movie.runtime} min`
-                    : "N/A";
-
-        }
-
-
-        // ====================================================
-        // DESCRIPTION
-        // ====================================================
-
-        if (modalDescription) {
-
-            modalDescription.textContent =
-                movie.overview ||
-                "No description available.";
-
-        }
-
-
-        // ====================================================
-        // BACKDROP
-        // ====================================================
-
-        if (modalImage) {
-
-            if (
-                movie.backdrop_path
-            ) {
-
-                modalImage.style.backgroundImage =
-                    `url("${BACKDROP_BASE}${movie.backdrop_path}")`;
-
-            } else if (
-                movie.poster_path
-            ) {
-
-                modalImage.style.backgroundImage =
-                    `url("${IMAGE_BASE}${movie.poster_path}")`;
-
-            } else {
-
-                modalImage.style.backgroundImage =
-                    "none";
-
+    renderMovieDetails(
+        movie,
+        state.currentTrailerKey
+            ? {
+                key:
+                    state.currentTrailerKey
             }
-
-        }
-
-
-        // ====================================================
-        // GENRES
-        // ====================================================
-
-        if (modalGenres) {
-
-            modalGenres.innerHTML =
-                "";
+            : null
+    );
 
 
-            (movie.genres || [])
-                .forEach(
-                    (genre) => {
-
-                        const tag =
-                            document.createElement(
-                                "span"
-                            );
-
-
-                        tag.className =
-                            "genre";
-
-
-                        tag.textContent =
-                            genre.name;
-
-
-                        modalGenres.appendChild(
-                            tag
-                        );
-
-                    }
-                );
-
-        }
-
-
-        // ====================================================
-        // UPDATE MY LIST BUTTON
-        // ====================================================
-
-        updateModalListButton();
-
-
-        // ====================================================
-        // SHOW MODAL
-        // ====================================================
-
-        if (movieModal) {
-
-            movieModal.classList.add(
-                "active"
-            );
-
-        }
-
-
-        document.body.style.overflow =
-            "hidden";
-
-
-    } catch (error) {
-
-        console.error(
-            "❌ Movie details:",
-            error
-        );
-
-
-        showToast(
-            "Could not load movie details."
-        );
-
-    }
+    updateWatchlistCounts();
 
 }
 
 
-// ============================================================
-// CLOSE MODAL
-// ============================================================
+/* ============================================================
+   35. STATUS LABEL
+============================================================ */
 
-function closeModal() {
+function getStatusLabel(
+    status
+) {
 
-    if (!movieModal) {
+    const labels = {
+
+        favorite: "Favorites",
+
+        watched: "Already Watched",
+
+        towatch: "To Be Watched"
+
+    };
+
+
+    return labels[
+        status
+    ] || "Watch List";
+
+}
+
+
+/* ============================================================
+   36. MOVIE MODAL SETUP
+============================================================ */
+
+function setupMovieModal() {
+
+    getElement(
+        "movieModalClose"
+    )?.addEventListener(
+        "click",
+        closeMovieModal
+    );
+
+
+    getElement(
+        "movieModal"
+    )?.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target.id ===
+                "movieModal"
+            ) {
+
+                closeMovieModal();
+
+            }
+
+        }
+    );
+
+
+    document.addEventListener(
+        "keydown",
+        event => {
+
+            if (
+                event.key === "Escape"
+            ) {
+
+                closeMovieModal();
+
+                closeAccountModal();
+
+            }
+
+        }
+    );
+
+}
+
+
+/* ============================================================
+   37. CLOSE MOVIE MODAL
+============================================================ */
+
+function closeMovieModal() {
+
+    const modal =
+        getElement(
+            "movieModal"
+        );
+
+
+    if (!modal) {
+
         return;
+
     }
 
 
-    movieModal.classList.remove(
+    modal.classList.remove(
         "active"
     );
 
@@ -1219,122 +2266,73 @@ function closeModal() {
     document.body.style.overflow =
         "";
 
-}
+
+    const details =
+        getElement(
+            "movieDetails"
+        );
 
 
-if (modalClose) {
+    if (details) {
 
-    modalClose.addEventListener(
-        "click",
-        closeModal
-    );
-
-}
-
-
-if (modalBackdrop) {
-
-    modalBackdrop.addEventListener(
-        "click",
-        closeModal
-    );
-
-}
-
-
-document.addEventListener(
-    "keydown",
-    (event) => {
-
-        if (
-            event.key ===
-            "Escape"
-        ) {
-
-            closeModal();
-
-        }
+        details.innerHTML = "";
 
     }
-);
-// ============================================================
-// PART 6: TRAILER + MY LIST
-// ============================================================
 
 
-// ============================================================
-// TRAILER
-// ============================================================
+    state.currentMovie =
+        null;
 
-if (modalTrailer) {
 
-    modalTrailer.addEventListener(
+    state.currentTrailerKey =
+        null;
+
+}
+
+
+/* ============================================================
+   38. HERO BUTTONS
+============================================================ */
+
+function setupHeroButtons() {
+
+    getElement(
+        "heroInfoButton"
+    )?.addEventListener(
+        "click",
+        () => {
+
+            if (
+                state.heroMovie
+            ) {
+
+                openMovieDetails(
+                    state.heroMovie.id
+                );
+
+            }
+
+        }
+    );
+
+
+    getElement(
+        "heroTrailerButton"
+    )?.addEventListener(
         "click",
         async () => {
 
-            if (!currentMovie) {
+            if (
+                !state.heroMovie
+            ) {
+
                 return;
+
             }
 
 
-            const videos =
-                currentMovie.videos?.results ||
-                [];
-
-
-            const trailer =
-
-                videos.find(
-                    (video) =>
-                        video.site ===
-                            "YouTube" &&
-                        video.type ===
-                            "Trailer" &&
-                        video.official ===
-                            true
-                )
-
-                ||
-
-                videos.find(
-                    (video) =>
-                        video.site ===
-                            "YouTube" &&
-                        video.type ===
-                            "Trailer"
-                )
-
-                ||
-
-                videos.find(
-                    (video) =>
-                        video.site ===
-                        "YouTube"
-                );
-
-
-            if (trailer) {
-
-                window.open(
-                    `https://www.youtube.com/watch?v=${trailer.key}`,
-                    "_blank"
-                );
-
-                return;
-            }
-
-
-            // Fallback search
-
-            const query =
-                encodeURIComponent(
-                    `${currentMovie.title} official trailer`
-                );
-
-
-            window.open(
-                `https://www.youtube.com/results?search_query=${query}`,
-                "_blank"
+            openMovieDetails(
+                state.heroMovie.id
             );
 
         }
@@ -1343,341 +2341,150 @@ if (modalTrailer) {
 }
 
 
-// ============================================================
-// CHECK MY LIST
-// ============================================================
+/* ============================================================
+   39. UPDATE HERO
+============================================================ */
 
-function isInMyList(
-    movieId
-) {
-
-    return myList.some(
-        (movie) =>
-            movie.id === movieId
-    );
-
-}
-
-
-// ============================================================
-// TOGGLE MY LIST
-// ============================================================
-
-function toggleMyList(
+function updateHero(
     movie
 ) {
 
-    if (
-        !movie ||
-        !movie.id
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        isInMyList(
-            movie.id
-        )
-    ) {
-
-        myList =
-            myList.filter(
-                (item) =>
-                    item.id !==
-                    movie.id
-            );
-
-
-        showToast(
-            "Removed from My List."
+    const title =
+        getElement(
+            "heroTitle"
         );
 
 
-    } else {
-
-        myList.push({
-
-            id:
-                movie.id,
-
-            title:
-                movie.title,
-
-            poster_path:
-                movie.poster_path,
-
-            backdrop_path:
-                movie.backdrop_path,
-
-            release_date:
-                movie.release_date,
-
-            vote_average:
-                movie.vote_average,
-
-            overview:
-                movie.overview
-
-        });
-
-
-        showToast(
-            "Added to My List ❤️"
-        );
-
-    }
-
-
-    saveMyList();
-
-
-    renderMyList();
-
-
-    updateModalListButton();
-
-}
-
-
-// ============================================================
-// SAVE MY LIST
-// ============================================================
-
-function saveMyList() {
-
-    localStorage.setItem(
-        "movieflix-list",
-        JSON.stringify(
-            myList
-        )
-    );
-
-}
-
-
-// ============================================================
-// RENDER MY LIST
-// ============================================================
-
-function renderMyList() {
-
-    if (!myListMovies) {
-        return;
-    }
-
-
-    myListMovies.innerHTML =
-        "";
-
-
-    if (
-        !myList.length
-    ) {
-
-        if (emptyList) {
-
-            emptyList.style.display =
-                "block";
-
-        }
-
-        return;
-
-    }
-
-
-    if (emptyList) {
-
-        emptyList.style.display =
-            "none";
-
-    }
-
-
-    renderMovies(
-        myList,
-        myListMovies
-    );
-
-}
-
-
-// ============================================================
-// UPDATE MODAL MY LIST BUTTON
-// ============================================================
-
-function updateModalListButton() {
-
-    if (
-        !currentMovie ||
-        !modalList
-    ) {
-
-        return;
-
-    }
-
-
-    const exists =
-        isInMyList(
-            currentMovie.id
+    const description =
+        getElement(
+            "heroDescription"
         );
 
 
-    if (exists) {
+    const year =
+        getElement(
+            "heroYear"
+        );
 
-        modalList.innerHTML = `
 
-            <i class="fa-solid fa-check"></i>
+    const rating =
+        getElement(
+            "heroRating"
+        );
 
-            Remove from My List
 
-        `;
+    if (!movie) {
 
-    } else {
+        return;
 
-        modalList.innerHTML = `
+    }
 
-            <i class="fa-solid fa-plus"></i>
 
-            My List
+    if (title) {
 
-        `;
+        title.textContent =
+            movie.title ||
+            movie.name ||
+            "MovieFlix";
+
+    }
+
+
+    if (description) {
+
+        description.textContent =
+            movie.overview ||
+            "Discover your next favorite movie.";
+
+    }
+
+
+    if (year) {
+
+        year.textContent =
+            getMovieYear(
+                movie
+            );
+
+    }
+
+
+    if (rating) {
+
+        rating.textContent =
+            `⭐ ${Number(
+                movie.vote_average || 0
+            ).toFixed(1)}`;
+
+    }
+
+
+    const hero =
+        getElement(
+            "hero"
+        );
+
+
+    if (
+        hero &&
+        movie.backdrop_path
+    ) {
+
+        hero.style.backgroundImage = `url("${TMDB_BACKDROP_URL}${movie.backdrop_path}")`;
+
+        hero.style.backgroundSize =
+            "cover";
+
+        hero.style.backgroundPosition =
+            "center";
 
     }
 
 }
 
 
-// ============================================================
-// MODAL MY LIST BUTTON
-// ============================================================
+/* ============================================================
+   40. SEARCH
+============================================================ */
 
-if (modalList) {
+function setupSearch() {
 
-    modalList.addEventListener(
-        "click",
-        () => {
-
-            if (currentMovie) {
-
-                toggleMyList(
-                    currentMovie
-                );
-
-            }
-
-        }
-    );
-
-}
-// ============================================================
-// PART 7: SEARCH
-// ============================================================
-
-let searchTimer = null;
+    const input =
+        getElement(
+            "searchInput"
+        );
 
 
-// ============================================================
-// OPEN SEARCH
-// ============================================================
+    if (!input) {
 
-if (searchButton) {
+        return;
 
-    searchButton.addEventListener(
-        "click",
-        () => {
-
-            searchBox.classList.toggle(
-                "active"
-            );
+    }
 
 
-            if (
-                searchBox.classList.contains(
-                    "active"
-                )
-            ) {
-
-                searchInput.focus();
-
-            }
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// CLOSE SEARCH
-// ============================================================
-
-if (closeSearch) {
-
-    closeSearch.addEventListener(
-        "click",
-        () => {
-
-            searchBox.classList.remove(
-                "active"
-            );
-
-
-            searchInput.value =
-                "";
-
-
-            if (
-                searchResultsSection
-            ) {
-
-                searchResultsSection.classList.add(
-                    "hidden"
-                );
-
-            }
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// SEARCH INPUT
-// ============================================================
-
-if (searchInput) {
-
-    searchInput.addEventListener(
+    input.addEventListener(
         "input",
         () => {
 
-            clearTimeout(
-                searchTimer
-            );
-
-
             const query =
-                searchInput.value.trim();
+                input.value.trim();
+
+
+            clearTimeout(
+                state.searchTimeout
+            );
 
 
             if (!query) {
 
-                searchResultsSection.classList.add(
-                    "hidden"
-                );
+                hideSearchResults();
 
                 return;
 
             }
 
 
-            searchTimer =
+            state.searchTimeout =
                 setTimeout(
                     () => {
 
@@ -1693,25 +2500,19 @@ if (searchInput) {
     );
 
 
-    searchInput.addEventListener(
+    input.addEventListener(
         "keydown",
-        (event) => {
+        event => {
 
             if (
-                event.key ===
-                "Enter"
+                event.key === "Enter"
             ) {
 
                 event.preventDefault();
 
 
-                clearTimeout(
-                    searchTimer
-                );
-
-
                 const query =
-                    searchInput.value.trim();
+                    input.value.trim();
 
 
                 if (query) {
@@ -1730,780 +2531,1266 @@ if (searchInput) {
 }
 
 
-// ============================================================
-// SEARCH MOVIES
-// ============================================================
+/* ============================================================
+   41. SEARCH MOVIES
+============================================================ */
 
 async function searchMovies(
     query
 ) {
 
-    try {
-
-        if (
-            searchResultsSection
-        ) {
-
-            searchResultsSection.classList.remove(
-                "hidden"
-            );
-
-        }
+    navigateTo(
+        "home"
+    );
 
 
-        if (searchQuery) {
-
-            searchQuery.textContent =
-                `"${query}"`;
-
-        }
-
-
-        if (searchResults) {
-
-            searchResults.innerHTML = `
-
-                <p style="
-                    color:#888;
-                    padding:20px;
-                ">
-
-                    Searching for
-                    "${escapeHTML(query)}"...
-
-                </p>
-
-            `;
-
-        }
-
-
-        const data =
-            await fetchAPI(
-                `/search/movie?language=en-US&query=${encodeURIComponent(
-                    query
-                )}&page=1&include_adult=false`
-            );
-
-
-        renderMovies(
-            data.results || [],
-            searchResults
+    const section =
+        getElement(
+            "searchResultsSection"
         );
 
 
-        if (
-            searchResultsSection
-        ) {
+    const container =
+        getElement(
+            "searchResults"
+        );
 
-            searchResultsSection.scrollIntoView({
-                behavior:
-                    "smooth",
 
-                block:
-                    "start"
-            });
+    const queryText =
+        getElement(
+            "searchQuery"
+        );
+
+
+    section?.classList.remove(
+        "hidden"
+    );
+
+
+    if (queryText) {
+
+        queryText.textContent =
+            `Results for "${query}"`;
+
+    }
+
+
+    if (container) {
+
+        container.innerHTML = `
+
+            <div
+                class="loading-message"
+                style="grid-column:1/-1;"
+            >
+
+                <div class="loader"></div>
+
+                <p>
+                    Searching...
+                </p>
+
+            </div>
+
+        `;
+
+    }
+
+
+    try {
+
+        const data =
+            await tmdbFetch(
+                "/search/movie",
+                {
+
+                    query,
+
+                    page: 1,
+
+                    include_adult:
+                        false
+
+                }
+            );
+
+
+        const movies =
+            data.results || [];
+
+
+        if (!movies.length) {
+
+            container.innerHTML = `
+
+                <div
+                    class="loading-message"
+                    style="grid-column:1/-1;"
+                >
+
+                    <i
+                        class="fa-solid fa-film"
+                        style="font-size:35px;"
+                    ></i>
+
+                    <p>
+                        No movies found.
+                    </p>
+
+                </div>
+
+            `;
+
+            return;
 
         }
 
+
+        container.innerHTML =
+            movies
+                .map(
+                    movie =>
+                        createMovieCard(
+                            movie
+                        )
+                )
+                .join("");
+
+
+        attachMovieCardEvents(
+            container
+        );
+
+
+        section.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
 
     } catch (error) {
 
         console.error(
-            "❌ Search:",
+            "Search error:",
             error
         );
 
 
-        showToast(
-            "Search failed."
+        container.innerHTML = `
+
+            <p
+                class="loading-message"
+                style="grid-column:1/-1;"
+            >
+                Search failed.
+            </p>
+
+        `;
+
+    }
+
+}
+
+
+/* ============================================================
+   42. HIDE SEARCH RESULTS
+============================================================ */
+
+function hideSearchResults() {
+
+    getElement(
+        "searchResultsSection"
+    )?.classList.add(
+        "hidden"
+    );
+
+}
+
+
+/* ============================================================
+   43. MOVIES PAGE
+============================================================ */
+
+let moviesLoaded = false;
+
+
+async function loadMoviesPage() {
+
+    await loadGenres();
+
+    await fetchMoviesPage();
+
+    moviesLoaded = true;
+
+}
+
+
+/* ============================================================
+   44. GENRES
+============================================================ */
+
+async function loadGenres() {
+
+    const select =
+        getElement(
+            "genreFilter"
+        );
+
+
+    if (!select) {
+
+        return;
+
+    }
+
+
+    if (
+        select.options.length > 1
+    ) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const data =
+            await tmdbFetch(
+                "/genre/movie/list"
+            );
+
+
+        data.genres?.forEach(
+            genre => {
+
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+
+
+                option.value =
+                    genre.id;
+
+
+                option.textContent =
+                    genre.name;
+
+
+                select.appendChild(
+                    option
+                );
+
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Genre error:",
+            error
         );
 
     }
 
 }
-// ============================================================
-// PART 8: NAVIGATION + HELPERS + START APP
-// ============================================================
 
 
-// ============================================================
-// SEE ALL BUTTONS
-// ============================================================
+/* ============================================================
+   45. MOVIE FILTERS
+============================================================ */
 
-$$(".see-all").forEach(
-    (button) => {
+function setupFilters() {
 
-        button.addEventListener(
-            "click",
-            () => {
+    getElement(
+        "genreFilter"
+    )?.addEventListener(
+        "change",
+        () => {
 
-                const sectionName =
-                    button.dataset.section;
+            state.moviesPage = 1;
 
+            fetchMoviesPage();
 
-                let target =
-                    null;
-
-
-                if (
-                    sectionName ===
-                    "trending"
-                ) {
-
-                    target =
-                        trendingMovies;
-
-                } else if (
-                    sectionName ===
-                    "popular"
-                ) {
-
-                    target =
-                        popularMovies;
-
-                } else if (
-                    button.dataset.target
-                ) {
-
-                    target =
-                        document.getElementById(
-                            button.dataset.target
-                        );
-
-                }
+        }
+    );
 
 
-                if (!target) {
-                    return;
-                }
+    getElement(
+        "sortFilter"
+    )?.addEventListener(
+        "change",
+        () => {
+
+            state.moviesPage = 1;
+
+            fetchMoviesPage();
+
+        }
+    );
+
+}
 
 
-                target.scrollTo({
+/* ============================================================
+   46. FETCH MOVIE PAGE
+============================================================ */
 
-                    left:
-                        target.scrollWidth,
+async function fetchMoviesPage() {
 
-                    behavior:
-                        "smooth"
+    const container =
+        getElement(
+            "allMovies"
+        );
 
-                });
+
+    if (!container) {
+
+        return;
+
+    }
+
+
+    container.innerHTML =
+        createLoadingCards(
+            10
+        );
+
+
+    const genre =
+        getElement(
+            "genreFilter"
+        )?.value ||
+        "all";
+
+
+    const sort =
+        getElement(
+            "sortFilter"
+        )?.value ||
+        "popularity.desc";
+
+
+    const params = {
+
+        page:
+            state.moviesPage,
+
+        sort_by:
+            sort,
+
+        include_adult:
+            false,
+
+        include_video:
+            false
+
+    };
+
+
+    if (
+        genre !== "all"
+    ) {
+
+        params.with_genres =
+            genre;
+
+    }
+
+
+    try {
+
+        const data =
+            await tmdbFetch(
+                "/discover/movie",
+                params
+            );
+
+
+        container.innerHTML =
+            data.results
+                ?.map(
+                    movie =>
+                        createMovieCard(
+                            movie
+                        )
+                )
+                .join("") ||
+            "";
+
+
+        attachMovieCardEvents(
+            container
+        );
+
+
+        updatePagination(
+            data.page,
+            data.total_pages
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Movies page error:",
+            error
+        );
+
+
+        container.innerHTML = `
+
+            <p
+                class="loading-message"
+                style="grid-column:1/-1;"
+            >
+
+                Unable to load movies.
+
+            </p>
+
+        `;
+
+    }
+
+}
+
+
+/* ============================================================
+   47. LOADING CARDS
+============================================================ */
+
+function createLoadingCards(
+    count
+) {
+
+    return Array.from(
+        {
+            length: count
+        },
+        () =>
+            `<div class="movie-loading"></div>`
+    ).join("");
+
+}
+
+
+/* ============================================================
+   48. PAGINATION
+============================================================ */
+
+function setupPagination() {
+
+    getElement(
+        "previousPage"
+    )?.addEventListener(
+        "click",
+        () => {
+
+            if (
+                state.moviesPage <= 1
+            ) {
+
+                return;
 
             }
-        );
-
-    }
-);
 
 
-// ============================================================
-// HEADER SCROLL EFFECT
-// ============================================================
+            state.moviesPage--;
 
-window.addEventListener(
-    "scroll",
-    () => {
+            fetchMoviesPage();
 
-        const header =
-            $(".header");
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
 
-
-        if (!header) {
-            return;
         }
+    );
 
 
-        header.classList.toggle(
-            "scrolled",
-            window.scrollY > 40
+    getElement(
+        "nextPage"
+    )?.addEventListener(
+        "click",
+        () => {
+
+            state.moviesPage++;
+
+            fetchMoviesPage();
+
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
+
+        }
+    );
+
+}
+
+
+/* ============================================================
+   49. UPDATE PAGINATION
+============================================================ */
+
+function updatePagination(
+    current,
+    total
+) {
+
+    const number =
+        getElement(
+            "pageNumber"
         );
 
+
+    const previous =
+        getElement(
+            "previousPage"
+        );
+
+
+    const next =
+        getElement(
+            "nextPage"
+        );
+
+
+    if (number) {
+
+        number.textContent =
+            current;
+
     }
-);
 
 
-// ============================================================
-// NAVIGATION
-// ============================================================
+    if (previous) {
 
-$$(".nav-link").forEach(
-    (link) => {
+        previous.disabled =
+            current <= 1;
 
-        link.addEventListener(
-            "click",
-            () => {
+    }
 
-                $$(".nav-link").forEach(
-                    (item) => {
 
-                        item.classList.remove(
+    if (next) {
+
+        next.disabled =
+            current >=
+            Math.min(
+                total || 1,
+                500
+            );
+
+    }
+
+}
+
+
+/* ============================================================
+   50. WATCHLIST
+============================================================ */
+
+function setupWatchlist() {
+
+    document
+        .querySelectorAll(
+            ".watchlist-tab"
+        )
+        .forEach(
+            tab => {
+
+                tab.addEventListener(
+                    "click",
+                    () => {
+
+                        state.currentWatchStatus =
+                            tab.dataset.watchStatus;
+
+
+                        document
+                            .querySelectorAll(
+                                ".watchlist-tab"
+                            )
+                            .forEach(
+                                item =>
+                                    item.classList.remove(
+                                        "active"
+                                    )
+                            );
+
+
+                        tab.classList.add(
                             "active"
                         );
+
+
+                        renderWatchlist();
 
                     }
                 );
 
-
-                link.classList.add(
-                    "active"
-                );
-
             }
         );
 
-    }
-);
+}
 
 
-// ============================================================
-// TOAST
-// ============================================================
+/* ============================================================
+   51. RENDER WATCHLIST
+============================================================ */
 
-let toastTimer = null;
+function renderWatchlist() {
 
-
-function showToast(
-    message
-) {
-
-    if (!toast) {
-        return;
-    }
-
-
-    toast.textContent =
-        message;
-
-
-    toast.classList.add(
-        "show"
-    );
-
-
-    clearTimeout(
-        toastTimer
-    );
-
-
-    toastTimer =
-        setTimeout(
-            () => {
-
-                toast.classList.remove(
-                    "show"
-                );
-
-            },
-            2500
+    const container =
+        getElement(
+            "watchlistMovies"
         );
 
-}
 
+    const empty =
+        getElement(
+            "emptyWatchlist"
+        );
 
-// ============================================================
-// GET YEAR
-// ============================================================
-
-function getYear(
-    date
-) {
-
-    if (!date) {
-        return "N/A";
-    }
-
-
-    return String(
-        date
-    ).substring(
-        0,
-        4
-    );
-
-}
-
-
-// ============================================================
-// FORMAT RATING
-// ============================================================
-
-function formatRating(
-    value
-) {
-
-    const rating =
-        Number(value);
-
-
-    if (
-        !Number.isFinite(
-            rating
-        ) ||
-        rating <= 0
-    ) {
-
-        return "N/A";
-
-    }
-
-
-    return rating.toFixed(
-        1
-    );
-
-}
-
-
-// ============================================================
-// SECTION ERROR
-// ============================================================
-
-function showSectionError(
-    container
-) {
 
     if (!container) {
+
         return;
+
     }
 
 
-    container.innerHTML = `
+    if (!state.currentUser) {
 
-        <p style="
-            color:#777;
-            padding:15px 0;
-            font-size:13px;
-        ">
+        container.innerHTML = "";
 
-            Movies could not be loaded.
+        empty?.classList.remove(
+            "hidden"
+        );
 
-        </p>
+
+        if (empty) {
+
+            empty.querySelector(
+                "h2"
+            ).textContent =
+                "Sign in to use your Watch List";
+
+
+            empty.querySelector(
+                "p"
+            ).textContent =
+                "Create an account to save favorites, watched movies and movies you want to watch.";
+
+        }
+
+
+        return;
+
+    }
+
+
+    const collection =
+        getUserCollection();
+
+
+    const movies =
+        collection[
+            state.currentWatchStatus
+        ] || [];
+
+
+    if (!movies.length) {
+
+        container.innerHTML = "";
+
+        empty?.classList.remove(
+            "hidden"
+        );
+
+
+        if (empty) {
+
+            empty.querySelector(
+                "h2"
+            ).textContent =
+                "Nothing here yet";
+
+
+            empty.querySelector(
+                "p"
+            ).textContent =
+                `Add movies to ${
+                    getStatusLabel(
+                        state.currentWatchStatus
+                    )
+                } from any movie card.`;
+
+        }
+
+
+        return;
+
+    }
+
+
+    empty?.classList.add(
+        "hidden"
+    );
+
+
+    container.innerHTML =
+        movies
+            .map(
+                movie =>
+                    createWatchlistCard(
+                        movie,
+                        state.currentWatchStatus
+                    )
+            )
+            .join("");
+
+
+    attachWatchlistEvents(
+        container
+    );
+
+}
+
+
+/* ============================================================
+   52. WATCHLIST CARD
+============================================================ */
+
+function createWatchlistCard(
+    movie,
+    status
+) {
+
+    const title =
+        movie.title ||
+        "Unknown Movie";
+
+
+    const poster =
+        getPosterUrl(
+            movie.poster_path
+        );
+
+
+    const year =
+        getMovieYear(
+            movie
+        );
+
+
+    const rating =
+        Number(
+            movie.vote_average || 0
+        ).toFixed(1);
+
+
+    return `
+
+        <article
+            class="movie-card"
+            data-watch-id="${movie.id}"
+        >
+
+            <div class="movie-poster">
+
+                ${
+                    poster
+                        ? `
+                            <img
+                                src="${poster}"
+                                alt="${escapeHTML(title)}"
+                            >
+                          `
+                        : `
+                            <div
+                                style="
+                                    height:100%;
+                                    display:grid;
+                                    place-items:center;
+                                "
+                            >
+                                <i
+                                    class="fa-solid fa-film"
+                                    style="font-size:30px;color:#777;"
+                                ></i>
+                            </div>
+                          `
+                }
+
+
+                <div class="movie-overlay">
+
+                    <button
+                        class="movie-info-button"
+                        type="button"
+                        data-watch-info="${movie.id}"
+                    >
+
+                        <i
+                            class="fa-solid fa-circle-info"
+                        ></i>
+
+                        More Info
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div class="movie-card-body">
+
+                <div
+                    class="movie-title"
+                    title="${escapeHTML(title)}"
+                >
+                    ${escapeHTML(title)}
+                </div>
+
+
+                <div class="movie-meta">
+
+                    <span>
+                        ${year}
+                    </span>
+
+
+                    <span class="movie-rating">
+
+                        ⭐ ${rating}
+
+                    </span>
+
+                </div>
+
+
+                <button
+                    class="secondary-button remove-watch-button"
+                    type="button"
+                    data-remove-id="${movie.id}"
+                    style="
+                        width:100%;
+                        margin-top:10px;
+                        min-height:36px;
+                        font-size:12px;
+                    "
+                >
+
+                    <i
+                        class="fa-solid fa-trash"
+                    ></i>
+
+                    Remove
+
+                </button>
+
+            </div>
+
+        </article>
 
     `;
 
 }
 
 
-// ============================================================
-// HIDE LOADING
-// ============================================================
+/* ============================================================
+   53. WATCHLIST EVENTS
+============================================================ */
 
-function hideLoading() {
-
-    if (!loadingScreen) {
-        return;
-    }
-
-
-    loadingScreen.classList.add(
-        "hide"
-    );
-
-
-    setTimeout(
-        () => {
-
-            loadingScreen.style.display =
-                "none";
-
-        },
-        600
-    );
-
-}
-
-
-// ============================================================
-// ESCAPE HTML
-// ============================================================
-
-function escapeHTML(
-    value
+function attachWatchlistEvents(
+    container
 ) {
 
-    return String(
-        value ?? ""
-    )
-
-        .replaceAll(
-            "&",
-            "&amp;"
+    container
+        .querySelectorAll(
+            ".movie-card"
         )
+        .forEach(
+            card => {
 
-        .replaceAll(
-            "<",
-            "&lt;"
+                card.addEventListener(
+                    "click",
+                    event => {
+
+                        if (
+                            event.target.closest(
+                                ".movie-info-button"
+                            ) ||
+                            event.target.closest(
+                                ".remove-watch-button"
+                            )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        openMovieDetails(
+                            card.dataset.watchId
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    container
+        .querySelectorAll(
+            ".movie-info-button"
         )
+        .forEach(
+            button => {
 
-        .replaceAll(
-            ">",
-            "&gt;"
+                button.addEventListener(
+                    "click",
+                    event => {
+
+                        event.stopPropagation();
+
+
+                        openMovieDetails(
+                            button.dataset.watchInfo
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    container
+        .querySelectorAll(
+            ".remove-watch-button"
         )
+        .forEach(
+            button => {
 
-        .replaceAll(
-            '"',
-            "&quot;"
-        )
+                button.addEventListener(
+                    "click",
+                    event => {
 
-        .replaceAll(
-            "'",
-            "&#039;"
+                        event.stopPropagation();
+
+
+                        removeMovieFromCollection(
+                            button.dataset.removeId,
+                            state.currentWatchStatus
+                        );
+
+
+                        showToast(
+                            "Movie removed."
+                        );
+
+
+                        renderWatchlist();
+
+                    }
+                );
+
+            }
         );
 
 }
 
 
-// ============================================================
-// START MOVIEFLIX
-// ============================================================
+/* ============================================================
+   54. WATCHLIST COUNTS
+============================================================ */
 
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
+function updateWatchlistCounts() {
 
-        console.log(
-            "🚀 MovieFlix initialized"
+    const collection =
+        getUserCollection();
+
+
+    const favoriteCount =
+        collection.favorite.length;
+
+
+    const watchedCount =
+        collection.watched.length;
+
+
+    const towatchCount =
+        collection.towatch.length;
+
+
+    const favorite =
+        getElement(
+            "favoriteCount"
         );
 
 
-        loadMovies();
+    const watched =
+        getElement(
+            "watchedCount"
+        );
+
+
+    const towatch =
+        getElement(
+            "watchlaterCount"
+        );
+
+
+    if (favorite) {
+
+        favorite.textContent =
+            favoriteCount;
 
     }
-);
-// ============================================================
-// MOVIEFLIX ACCOUNT SYSTEM
-// PART 3 - AUTHENTICATION
-// ============================================================
 
 
-// ============================================================
-// ACCOUNT STORAGE
-// ============================================================
+    if (watched) {
 
-const ACCOUNT_STORAGE_KEY =
-    "movieflix-accounts";
+        watched.textContent =
+            watchedCount;
 
-const CURRENT_USER_KEY =
-    "movieflix-current-user";
-
-const SETTINGS_STORAGE_KEY =
-    "movieflix-settings";
+    }
 
 
-// ============================================================
-// ACCOUNT DOM ELEMENTS
-// ============================================================
+    if (towatch) {
 
-const accountButton =
-    document.getElementById(
+        towatch.textContent =
+            towatchCount;
+
+    }
+
+
+    const dashboardFavorite =
+        getElement(
+            "dashboardFavoriteCount"
+        );
+
+
+    const dashboardWatched =
+        getElement(
+            "dashboardWatchedCount"
+        );
+
+
+    const dashboardTowatch =
+        getElement(
+            "dashboardToWatchCount"
+        );
+
+
+    const dashboardReviews =
+        getElement(
+            "dashboardReviewCount"
+        );
+
+
+    if (dashboardFavorite) {
+
+        dashboardFavorite.textContent =
+            favoriteCount;
+
+    }
+
+
+    if (dashboardWatched) {
+
+        dashboardWatched.textContent =
+            watchedCount;
+
+    }
+
+
+    if (dashboardTowatch) {
+
+        dashboardTowatch.textContent =
+            towatchCount;
+
+    }
+
+
+    if (dashboardReviews) {
+
+        dashboardReviews.textContent =
+            getCurrentUserReviewCount();
+
+    }
+
+}
+
+
+/* ============================================================
+   55. ACCOUNT MODAL
+============================================================ */
+
+function setupAccountModal() {
+
+    getElement(
         "accountButton"
-    );
-
-const accountOverlay =
-    document.getElementById(
-        "accountOverlay"
-    );
-
-const accountModal =
-    document.getElementById(
-        "accountModal"
-    );
-
-const accountClose =
-    document.getElementById(
-        "accountClose"
-    );
-
-
-const accountAuth =
-    document.getElementById(
-        "accountAuth"
-    );
-
-const accountDashboard =
-    document.getElementById(
-        "accountDashboard"
-    );
-
-
-const loginForm =
-    document.getElementById(
-        "loginForm"
-    );
-
-const registerForm =
-    document.getElementById(
-        "registerForm"
-    );
-
-
-const loginFormElement =
-    document.getElementById(
-        "loginFormElement"
-    );
-
-const registerFormElement =
-    document.getElementById(
-        "registerFormElement"
-    );
-
-
-const showRegister =
-    document.getElementById(
-        "showRegister"
-    );
-
-const showLogin =
-    document.getElementById(
-        "showLogin"
-    );
-
-
-const loginEmail =
-    document.getElementById(
-        "loginEmail"
-    );
-
-const loginPassword =
-    document.getElementById(
-        "loginPassword"
-    );
-
-
-const registerName =
-    document.getElementById(
-        "registerName"
-    );
-
-const registerEmail =
-    document.getElementById(
-        "registerEmail"
-    );
-
-const registerPassword =
-    document.getElementById(
-        "registerPassword"
-    );
-
-
-const loginError =
-    document.getElementById(
-        "loginError"
-    );
-
-const registerError =
-    document.getElementById(
-        "registerError"
-    );
-
-
-const profileAvatar =
-    document.getElementById(
-        "profileAvatar"
-    );
-
-const profileName =
-    document.getElementById(
-        "profileName"
-    );
-
-const profileEmail =
-    document.getElementById(
-        "profileEmail"
-    );
-
-
-const dashboardName =
-    document.getElementById(
-        "dashboardName"
-    );
-
-const dashboardEmail =
-    document.getElementById(
-        "dashboardEmail"
-    );
-
-
-const logoutButton =
-    document.getElementById(
-        "logoutButton"
-    );
-
-
-const accountPageProfile =
-    document.getElementById(
-        "accountPageProfile"
-    );
-
-const accountPageSettings =
-    document.getElementById(
-        "accountPageSettings"
-    );
-
-const accountPageList =
-    document.getElementById(
-        "accountPageList"
-    );
-
-
-const goToMyList =
-    document.getElementById(
-        "goToMyList"
-    );
-
-
-const autoplaySetting =
-    document.getElementById(
-        "autoplaySetting"
-    );
-
-const notificationSetting =
-    document.getElementById(
-        "notificationSetting"
-    );
-
-
-// ============================================================
-// GET ACCOUNTS
-// ============================================================
-
-function getAccounts() {
-
-    try {
-
-        return JSON.parse(
-            localStorage.getItem(
-                ACCOUNT_STORAGE_KEY
-            ) || "[]"
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Could not read accounts:",
-            error
-        );
-
-        return [];
-
-    }
-
-}
-
-
-// ============================================================
-// SAVE ACCOUNTS
-// ============================================================
-
-function saveAccounts(
-    accounts
-) {
-
-    localStorage.setItem(
-        ACCOUNT_STORAGE_KEY,
-        JSON.stringify(accounts)
-    );
-
-}
-
-
-// ============================================================
-// GET CURRENT USER
-// ============================================================
-
-function getCurrentUser() {
-
-    try {
-
-        return JSON.parse(
-            localStorage.getItem(
-                CURRENT_USER_KEY
-            ) || "null"
-        );
-
-    } catch (error) {
-
-        return null;
-
-    }
-
-}
-
-
-// ============================================================
-// SAVE CURRENT USER
-// ============================================================
-
-function saveCurrentUser(
-    user
-) {
-
-    localStorage.setItem(
-        CURRENT_USER_KEY,
-        JSON.stringify(user)
-    );
-
-}
-
-
-// ============================================================
-// REMOVE CURRENT USER
-// ============================================================
-
-function removeCurrentUser() {
-
-    localStorage.removeItem(
-        CURRENT_USER_KEY
-    );
-
-}
-
-
-// ============================================================
-// OPEN ACCOUNT
-// ============================================================
-
-if (accountButton) {
-
-    accountButton.addEventListener(
+    )?.addEventListener(
         "click",
-        () => {
+        openAccountModal
+    );
 
-            openAccount();
+
+    getElement(
+        "accountClose"
+    )?.addEventListener(
+        "click",
+        closeAccountModal
+    );
+
+
+    getElement(
+        "accountOverlay"
+    )?.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target.id ===
+                "accountOverlay"
+            ) {
+
+                closeAccountModal();
+
+            }
 
         }
     );
 
+
+    getElement(
+        "showRegister"
+    )?.addEventListener(
+        "click",
+        showRegisterForm
+    );
+
+
+    getElement(
+        "showLogin"
+    )?.addEventListener(
+        "click",
+        showLoginForm
+    );
+
+
+    getElement(
+        "loginFormElement"
+    )?.addEventListener(
+        "submit",
+        handleLogin
+    );
+
+
+    getElement(
+        "registerFormElement"
+    )?.addEventListener(
+        "submit",
+        handleRegister
+    );
+
+
+    document
+        .querySelectorAll(
+            ".password-toggle"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        togglePassword(
+                            button.dataset.target,
+                            button
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll(
+            "[data-account-page]"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        showAccountPage(
+                            button.dataset.accountPage
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    getElement(
+        "saveProfileButton"
+    )?.addEventListener(
+        "click",
+        saveProfile
+    );
+
+
+    getElement(
+        "logoutButton"
+    )?.addEventListener(
+        "click",
+        logout
+    );
+
+
+    getElement(
+        "deleteAccountButton"
+    )?.addEventListener(
+        "click",
+        deleteAccount
+    );
+
 }
 
 
-// ============================================================
-// OPEN ACCOUNT FUNCTION
-// ============================================================
+/* ============================================================
+   56. OPEN ACCOUNT MODAL
+============================================================ */
 
-function openAccount() {
+function openAccountModal() {
 
-    if (!accountOverlay) {
+    const overlay =
+        getElement(
+            "accountOverlay"
+        );
+
+
+    if (!overlay) {
+
         return;
-    }
-
-
-    const user =
-        getCurrentUser();
-
-
-    if (user) {
-
-        showAccountDashboard();
-
-    } else {
-
-        showLoginForm();
 
     }
 
 
-    accountOverlay.classList.add(
+    overlay.classList.add(
         "active"
     );
 
@@ -2511,80 +3798,32 @@ function openAccount() {
     document.body.style.overflow =
         "hidden";
 
-}
 
-
-// ============================================================
-// CLOSE ACCOUNT
-// ============================================================
-
-if (accountClose) {
-
-    accountClose.addEventListener(
-        "click",
-        closeAccount
-    );
+    updateAccountUI();
 
 }
 
 
-if (accountOverlay) {
+/* ============================================================
+   57. CLOSE ACCOUNT MODAL
+============================================================ */
 
-    accountOverlay.addEventListener(
-        "click",
-        (event) => {
+function closeAccountModal() {
 
-            if (
-                event.target ===
-                accountOverlay
-            ) {
-
-                closeAccount();
-
-            }
-
-        }
-    );
-
-}
+    const overlay =
+        getElement(
+            "accountOverlay"
+        );
 
 
-// ============================================================
-// CLOSE WITH ESCAPE
-// ============================================================
+    if (!overlay) {
 
-document.addEventListener(
-    "keydown",
-    (event) => {
-
-        if (
-            event.key === "Escape" &&
-            accountOverlay &&
-            accountOverlay.classList.contains(
-                "active"
-            )
-        ) {
-
-            closeAccount();
-
-        }
-
-    }
-);
-
-
-// ============================================================
-// CLOSE ACCOUNT FUNCTION
-// ============================================================
-
-function closeAccount() {
-
-    if (!accountOverlay) {
         return;
+
     }
 
 
-    accountOverlay.classList.remove(
+    overlay.classList.remove(
         "active"
     );
 
@@ -2595,986 +3834,176 @@ function closeAccount() {
 }
 
 
-// ============================================================
-// SHOW LOGIN FORM
-// ============================================================
+/* ============================================================
+   58. UPDATE ACCOUNT UI
+============================================================ */
 
-function showLoginForm() {
+function updateAccountUI() {
 
-    if (accountAuth) {
+    const auth =
+        getElement(
+            "accountAuth"
+        );
 
-        accountAuth.classList.remove(
+
+    const dashboard =
+        getElement(
+            "accountDashboard"
+        );
+
+
+    const accountButton =
+        getElement(
+            "accountButton"
+        );
+
+
+    if (
+        state.currentUser
+    ) {
+
+        auth?.classList.add(
             "hidden"
         );
 
-    }
 
-
-    if (accountDashboard) {
-
-        accountDashboard.classList.add(
+        dashboard?.classList.remove(
             "hidden"
         );
 
-    }
+
+        updateProfileUI();
 
 
-    if (loginForm) {
+        showAccountPage(
+            "profile"
+        );
 
-        loginForm.classList.remove(
+
+        if (accountButton) {
+
+            accountButton.innerHTML = `
+
+                <i
+                    class="fa-solid fa-user-check"
+                ></i>
+
+                <span>
+                    ${escapeHTML(
+                        state.currentUser.name
+                    )}
+                </span>
+
+            `;
+
+        }
+
+    } else {
+
+        auth?.classList.remove(
             "hidden"
         );
 
-    }
 
-
-    if (registerForm) {
-
-        registerForm.classList.add(
+        dashboard?.classList.add(
             "hidden"
         );
 
-    }
-
-
-    clearAuthErrors();
-
-}
-
-
-// ============================================================
-// SHOW REGISTER FORM
-// ============================================================
-
-function showRegisterForm() {
-
-    if (accountAuth) {
-
-        accountAuth.classList.remove(
-            "hidden"
-        );
-
-    }
-
-
-    if (accountDashboard) {
-
-        accountDashboard.classList.add(
-            "hidden"
-        );
-
-    }
-
-
-    if (loginForm) {
-
-        loginForm.classList.add(
-            "hidden"
-        );
-
-    }
-
-
-    if (registerForm) {
-
-        registerForm.classList.remove(
-            "hidden"
-        );
-
-    }
-
-
-    clearAuthErrors();
-
-}
-
-
-// ============================================================
-// SHOW ACCOUNT DASHBOARD
-// ============================================================
-
-function showAccountDashboard() {
-
-    const user =
-        getCurrentUser();
-
-
-    if (!user) {
 
         showLoginForm();
 
-        return;
 
-    }
+        if (accountButton) {
 
+            accountButton.innerHTML = `
 
-    if (accountAuth) {
+                <i
+                    class="fa-regular fa-user"
+                ></i>
 
-        accountAuth.classList.add(
-            "hidden"
-        );
+                <span>
+                    Account
+                </span>
 
-    }
-
-
-    if (accountDashboard) {
-
-        accountDashboard.classList.remove(
-            "hidden"
-        );
-
-    }
-
-
-    updateProfileUI(
-        user
-    );
-
-
-    loadAccountSettings();
-
-
-    showAccountPage(
-        "profile"
-    );
-
-}
-
-
-// ============================================================
-// UPDATE PROFILE UI
-// ============================================================
-
-function updateProfileUI(
-    user
-) {
-
-    if (!user) {
-        return;
-    }
-
-
-    const name =
-        user.name ||
-        "MovieFlix User";
-
-
-    const email =
-        user.email ||
-        "";
-
-
-    if (profileName) {
-
-        profileName.textContent =
-            name;
-
-    }
-
-
-    if (profileEmail) {
-
-        profileEmail.textContent =
-            email;
-
-    }
-
-
-    if (dashboardName) {
-
-        dashboardName.textContent =
-            name;
-
-    }
-
-
-    if (dashboardEmail) {
-
-        dashboardEmail.textContent =
-            email;
-
-    }
-
-
-    if (profileAvatar) {
-
-        profileAvatar.textContent =
-            getInitials(name);
-
-    }
-
-}
-
-
-// ============================================================
-// GET INITIALS
-// ============================================================
-
-function getInitials(
-    name
-) {
-
-    const words =
-        String(name)
-            .trim()
-            .split(/\s+/);
-
-
-    if (!words.length) {
-        return "U";
-    }
-
-
-    if (words.length === 1) {
-
-        return words[0]
-            .substring(0, 1)
-            .toUpperCase();
-
-    }
-
-
-    return (
-        words[0].charAt(0) +
-        words[1].charAt(0)
-    ).toUpperCase();
-
-}
-
-
-// ============================================================
-// SWITCH LOGIN / REGISTER
-// ============================================================
-
-if (showRegister) {
-
-    showRegister.addEventListener(
-        "click",
-        () => {
-
-            showRegisterForm();
+            `;
 
         }
-    );
-
-}
-
-
-if (showLogin) {
-
-    showLogin.addEventListener(
-        "click",
-        () => {
-
-            showLoginForm();
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// REGISTER ACCOUNT
-// ============================================================
-
-if (registerFormElement) {
-
-    registerFormElement.addEventListener(
-        "submit",
-        (event) => {
-
-            event.preventDefault();
-
-
-            clearAuthErrors();
-
-
-            const name =
-                registerName.value.trim();
-
-
-            const email =
-                registerEmail.value
-                    .trim()
-                    .toLowerCase();
-
-
-            const password =
-                registerPassword.value;
-
-
-            // -----------------------------------------------
-            // VALIDATION
-            // -----------------------------------------------
-
-            if (
-                name.length <
-                2
-            ) {
-
-                showAuthError(
-                    registerError,
-                    "Please enter your name."
-                );
-
-                return;
-
-            }
-
-
-            if (
-                !isValidEmail(
-                    email
-                )
-            ) {
-
-                showAuthError(
-                    registerError,
-                    "Please enter a valid email address."
-                );
-
-                return;
-
-            }
-
-
-            if (
-                password.length <
-                6
-            ) {
-
-                showAuthError(
-                    registerError,
-                    "Password must contain at least 6 characters."
-                );
-
-                return;
-
-            }
-
-
-            // -----------------------------------------------
-            // CHECK EXISTING ACCOUNT
-            // -----------------------------------------------
-
-            const accounts =
-                getAccounts();
-
-
-            const existingAccount =
-                accounts.find(
-                    (account) =>
-                        account.email ===
-                        email
-                );
-
-
-            if (existingAccount) {
-
-                showAuthError(
-                    registerError,
-                    "An account with this email already exists."
-                );
-
-                return;
-
-            }
-
-
-            // -----------------------------------------------
-            // CREATE USER
-            // -----------------------------------------------
-
-            const newUser = {
-
-                id:
-                    "user_" +
-                    Date.now(),
-
-                name:
-                    name,
-
-                email:
-                    email,
-
-                password:
-                    password,
-
-                createdAt:
-                    new Date().toISOString(),
-
-                myList:
-                    []
-
-            };
-
-
-            accounts.push(
-                newUser
-            );
-
-
-            saveAccounts(
-                accounts
-            );
-
-
-            // -----------------------------------------------
-            // LOGIN AUTOMATICALLY
-            // -----------------------------------------------
-
-            const sessionUser = {
-
-                id:
-                    newUser.id,
-
-                name:
-                    newUser.name,
-
-                email:
-                    newUser.email
-
-            };
-
-
-            saveCurrentUser(
-                sessionUser
-            );
-
-
-            // -----------------------------------------------
-            // RESET FORM
-            // -----------------------------------------------
-
-            registerFormElement.reset();
-
-
-            showToast(
-                "Account created successfully! 🎉"
-            );
-
-
-            // -----------------------------------------------
-            // SHOW DASHBOARD
-            // -----------------------------------------------
-
-            showAccountDashboard();
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// LOGIN ACCOUNT
-// ============================================================
-
-if (loginFormElement) {
-
-    loginFormElement.addEventListener(
-        "submit",
-        (event) => {
-
-            event.preventDefault();
-
-
-            clearAuthErrors();
-
-
-            const email =
-                loginEmail.value
-                    .trim()
-                    .toLowerCase();
-
-
-            const password =
-                loginPassword.value;
-
-
-            if (
-                !isValidEmail(
-                    email
-                )
-            ) {
-
-                showAuthError(
-                    loginError,
-                    "Please enter a valid email address."
-                );
-
-                return;
-
-            }
-
-
-            if (!password) {
-
-                showAuthError(
-                    loginError,
-                    "Please enter your password."
-                );
-
-                return;
-
-            }
-
-
-            const accounts =
-                getAccounts();
-
-
-            const user =
-                accounts.find(
-                    (account) =>
-                        account.email ===
-                            email &&
-                        account.password ===
-                            password
-                );
-
-
-            if (!user) {
-
-                showAuthError(
-                    loginError,
-                    "Incorrect email or password."
-                );
-
-                return;
-
-            }
-
-
-            // -----------------------------------------------
-            // CREATE LOGIN SESSION
-            // -----------------------------------------------
-
-            const sessionUser = {
-
-                id:
-                    user.id,
-
-                name:
-                    user.name,
-
-                email:
-                    user.email
-
-            };
-
-
-            saveCurrentUser(
-                sessionUser
-            );
-
-
-            loginFormElement.reset();
-
-
-            showToast(
-                `Welcome back, ${user.name}! 👋`
-            );
-
-
-            showAccountDashboard();
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// LOGOUT
-// ============================================================
-
-if (logoutButton) {
-
-    logoutButton.addEventListener(
-        "click",
-        () => {
-
-            removeCurrentUser();
-
-
-            showToast(
-                "You have been signed out."
-            );
-
-
-            showLoginForm();
-
-
-            setTimeout(
-                () => {
-
-                    closeAccount();
-
-                },
-                700
-            );
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// PASSWORD VISIBILITY
-// ============================================================
-
-$$(".password-toggle").forEach(
-    (button) => {
-
-        button.addEventListener(
-            "click",
-            () => {
-
-                const targetId =
-                    button.dataset.target;
-
-
-                const input =
-                    document.getElementById(
-                        targetId
-                    );
-
-
-                if (!input) {
-                    return;
-                }
-
-
-                if (
-                    input.type ===
-                    "password"
-                ) {
-
-                    input.type =
-                        "text";
-
-
-                    button.innerHTML =
-                        `<i class="fa-solid fa-eye-slash"></i>`;
-
-                } else {
-
-                    input.type =
-                        "password";
-
-
-                    button.innerHTML =
-                        `<i class="fa-solid fa-eye"></i>`;
-
-                }
-
-            }
-        );
-
-    }
-);
-
-
-// ============================================================
-// ACCOUNT MENU
-// ============================================================
-
-$$(".account-menu-item").forEach(
-    (button) => {
-
-        button.addEventListener(
-            "click",
-            () => {
-
-                const page =
-                    button.dataset.accountPage;
-
-
-                showAccountPage(
-                    page
-                );
-
-
-                $$(".account-menu-item")
-                    .forEach(
-                        (item) => {
-
-                            item.classList.remove(
-                                "active"
-                            );
-
-                        }
-                    );
-
-
-                button.classList.add(
-                    "active"
-                );
-
-            }
-        );
-
-    }
-);
-
-
-// ============================================================
-// SHOW ACCOUNT PAGE
-// ============================================================
-
-function showAccountPage(
-    page
-) {
-
-    const pages = [
-
-        accountPageProfile,
-
-        accountPageSettings,
-
-        accountPageList
-
-    ];
-
-
-    pages.forEach(
-        (item) => {
-
-            if (item) {
-
-                item.classList.add(
-                    "hidden"
-                );
-
-            }
-
-        }
-    );
-
-
-    if (
-        page === "profile" &&
-        accountPageProfile
-    ) {
-
-        accountPageProfile.classList.remove(
-            "hidden"
-        );
 
     }
 
 
-    if (
-        page === "settings" &&
-        accountPageSettings
-    ) {
-
-        accountPageSettings.classList.remove(
-            "hidden"
-        );
-
-    }
-
-
-    if (
-        page === "list" &&
-        accountPageList
-    ) {
-
-        accountPageList.classList.remove(
-            "hidden"
-        );
-
-    }
+    updateWatchlistCounts();
 
 }
 
 
-// ============================================================
-// SETTINGS
-// ============================================================
+/* ============================================================
+   59. LOGIN FORM
+============================================================ */
 
-function getAccountSettings() {
+function showLoginForm() {
 
-    try {
-
-        return JSON.parse(
-            localStorage.getItem(
-                SETTINGS_STORAGE_KEY
-            ) ||
-            "{}"
-        );
-
-    } catch (error) {
-
-        return {};
-
-    }
-
-}
-
-
-// ============================================================
-// LOAD SETTINGS
-// ============================================================
-
-function loadAccountSettings() {
-
-    const settings =
-        getAccountSettings();
-
-
-    if (autoplaySetting) {
-
-        autoplaySetting.checked =
-            settings.autoplay === true;
-
-    }
-
-
-    if (notificationSetting) {
-
-        notificationSetting.checked =
-            settings.notifications !== false;
-
-    }
-
-}
-
-
-// ============================================================
-// SAVE SETTINGS
-// ============================================================
-
-function saveAccountSettings() {
-
-    const settings = {
-
-        autoplay:
-            autoplaySetting
-                ? autoplaySetting.checked
-                : false,
-
-        notifications:
-            notificationSetting
-                ? notificationSetting.checked
-                : true
-
-    };
-
-
-    localStorage.setItem(
-        SETTINGS_STORAGE_KEY,
-        JSON.stringify(settings)
+    getElement(
+        "loginForm"
+    )?.classList.remove(
+        "hidden"
     );
 
-}
 
-
-// ============================================================
-// SETTING EVENT LISTENERS
-// ============================================================
-
-if (autoplaySetting) {
-
-    autoplaySetting.addEventListener(
-        "change",
-        () => {
-
-            saveAccountSettings();
-
-            showToast(
-                "Autoplay setting saved."
-            );
-
-        }
+    getElement(
+        "registerForm"
+    )?.classList.add(
+        "hidden"
     );
 
+
+    clearAuthErrors();
+
 }
 
 
-if (notificationSetting) {
+/* ============================================================
+   60. REGISTER FORM
+============================================================ */
 
-    notificationSetting.addEventListener(
-        "change",
-        () => {
+function showRegisterForm() {
 
-            saveAccountSettings();
-
-            showToast(
-                "Notification setting saved."
-            );
-
-        }
+    getElement(
+        "loginForm"
+    )?.classList.add(
+        "hidden"
     );
 
-}
 
-
-// ============================================================
-// GO TO MY LIST
-// ============================================================
-
-if (goToMyList) {
-
-    goToMyList.addEventListener(
-        "click",
-        () => {
-
-            closeAccount();
-
-
-            const listSection =
-                myListMovies
-                    ? myListMovies.closest(
-                        ".section"
-                    )
-                    : null;
-
-
-            if (listSection) {
-
-                listSection.scrollIntoView({
-                    behavior:
-                        "smooth"
-                });
-
-            }
-
-        }
+    getElement(
+        "registerForm"
+    )?.classList.remove(
+        "hidden"
     );
 
-}
 
-
-// ============================================================
-// AUTH ERROR
-// ============================================================
-
-function showAuthError(
-    element,
-    message
-) {
-
-    if (!element) {
-        return;
-    }
-
-
-    element.textContent =
-        message;
+    clearAuthErrors();
 
 }
 
 
-// ============================================================
-// CLEAR AUTH ERRORS
-// ============================================================
+/* ============================================================
+   61. CLEAR AUTH ERRORS
+============================================================ */
 
 function clearAuthErrors() {
+
+    const loginError =
+        getElement(
+            "loginError"
+        );
+
+
+    const registerError =
+        getElement(
+            "registerError"
+        );
+
 
     if (loginError) {
 
@@ -3594,991 +4023,1735 @@ function clearAuthErrors() {
 }
 
 
-// ============================================================
-// EMAIL VALIDATION
-// ============================================================
+/* ============================================================
+   62. REGISTER
+============================================================ */
 
-function isValidEmail(
-    email
+function handleRegister(
+    event
 ) {
 
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        .test(email);
-
-}
+    event.preventDefault();
 
 
-// ============================================================
-// UPDATE HEADER ACCOUNT BUTTON
-// ============================================================
+    const name =
+        getElement(
+            "registerName"
+        )?.value.trim();
 
-function updateAccountButton() {
 
-    if (!accountButton) {
+    const email =
+        getElement(
+            "registerEmail"
+        )?.value.trim()
+        .toLowerCase();
+
+
+    const password =
+        getElement(
+            "registerPassword"
+        )?.value;
+
+
+    const confirmPassword =
+        getElement(
+            "registerConfirmPassword"
+        )?.value;
+
+
+    const error =
+        getElement(
+            "registerError"
+        );
+
+
+    if (!name || !email || !password) {
+
+        error.textContent =
+            "Please fill in all fields.";
+
         return;
-    }
-
-
-    const user =
-        getCurrentUser();
-
-
-    if (user) {
-
-        accountButton.innerHTML = `
-
-            <i class="fa-solid fa-user"></i>
-
-            <span>
-                ${escapeHTML(
-                    user.name
-                )}
-            </span>
-
-        `;
-
-        accountButton.title =
-            "Open your account";
-
-    } else {
-
-        accountButton.innerHTML = `
-
-            <i class="fa-solid fa-user"></i>
-
-            <span>
-                Account
-            </span>
-
-        `;
-
-        accountButton.title =
-            "Sign in or create an account";
-
-    }
-
-}
-
-
-// ============================================================
-// CHECK EXISTING LOGIN SESSION
-// ============================================================
-
-function initializeAccount() {
-
-    const user =
-        getCurrentUser();
-
-
-    if (user) {
-
-        console.log(
-            "👤 Logged in as:",
-            user.email
-        );
-
-    } else {
-
-        console.log(
-            "👤 No account currently logged in."
-        );
 
     }
 
 
-    updateAccountButton();
+    if (
+        password.length < 6
+    ) {
 
-}
+        error.textContent =
+            "Password must contain at least 6 characters.";
 
-
-// ============================================================
-// RUN ACCOUNT INITIALIZATION
-// ============================================================
-
-initializeAccount();
-// ============================================================
-// MOVIEFLIX ACCOUNT SYSTEM
-// PART 4 - ADVANCED FEATURES
-// ============================================================
-
-
-// ============================================================
-// PART 4 ELEMENTS
-// ============================================================
-
-const editProfileName =
-    document.getElementById(
-        "editProfileName"
-    );
-
-const editProfileAvatar =
-    document.getElementById(
-        "editProfileAvatar"
-    );
-
-const saveProfileButton =
-    document.getElementById(
-        "saveProfileButton"
-    );
-
-
-const currentPassword =
-    document.getElementById(
-        "currentPassword"
-    );
-
-const newPassword =
-    document.getElementById(
-        "newPassword"
-    );
-
-const confirmNewPassword =
-    document.getElementById(
-        "confirmNewPassword"
-    );
-
-const changePasswordButton =
-    document.getElementById(
-        "changePasswordButton"
-    );
-
-const passwordChangeError =
-    document.getElementById(
-        "passwordChangeError"
-    );
-
-
-const deleteAccountButton =
-    document.getElementById(
-        "deleteAccountButton"
-    );
-
-
-const accountMyList =
-    document.getElementById(
-        "accountMyList"
-    );
-
-const emptyAccountList =
-    document.getElementById(
-        "emptyAccountList"
-    );
-
-
-// ============================================================
-// LOAD EDIT PROFILE
-// ============================================================
-
-function loadEditProfile() {
-
-    const user =
-        getCurrentUser();
-
-
-    if (!user) {
         return;
-    }
-
-
-    if (editProfileName) {
-
-        editProfileName.value =
-            user.name || "";
 
     }
 
 
-    if (editProfileAvatar) {
+    if (
+        password !==
+        confirmPassword
+    ) {
 
-        editProfileAvatar.textContent =
-            getInitials(
-                user.name
-            );
+        error.textContent =
+            "Passwords do not match.";
 
-    }
-
-}
-
-
-// ============================================================
-// PROFILE NAME PREVIEW
-// ============================================================
-
-if (editProfileName) {
-
-    editProfileName.addEventListener(
-        "input",
-        () => {
-
-            const name =
-                editProfileName.value.trim();
-
-
-            if (editProfileAvatar) {
-
-                editProfileAvatar.textContent =
-                    name
-                        ? getInitials(name)
-                        : "U";
-
-            }
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// SAVE PROFILE
-// ============================================================
-
-if (saveProfileButton) {
-
-    saveProfileButton.addEventListener(
-        "click",
-        () => {
-
-            const user =
-                getCurrentUser();
-
-
-            if (!user) {
-                return;
-            }
-
-
-            const newName =
-                editProfileName.value.trim();
-
-
-            if (newName.length < 2) {
-
-                showToast(
-                    "Name must contain at least 2 characters."
-                );
-
-                return;
-
-            }
-
-
-            // -----------------------------------------------
-            // UPDATE SESSION
-            // -----------------------------------------------
-
-            user.name =
-                newName;
-
-
-            saveCurrentUser(
-                user
-            );
-
-
-            // -----------------------------------------------
-            // UPDATE ACCOUNTS
-            // -----------------------------------------------
-
-            const accounts =
-                getAccounts();
-
-
-            const accountIndex =
-                accounts.findIndex(
-                    account =>
-                        account.id ===
-                        user.id
-                );
-
-
-            if (
-                accountIndex !== -1
-            ) {
-
-                accounts[
-                    accountIndex
-                ].name =
-                    newName;
-
-
-                saveAccounts(
-                    accounts
-                );
-
-            }
-
-
-            // -----------------------------------------------
-            // UPDATE UI
-            // -----------------------------------------------
-
-            updateProfileUI(
-                user
-            );
-
-
-            updateAccountButton();
-
-
-            if (editProfileAvatar) {
-
-                editProfileAvatar.textContent =
-                    getInitials(
-                        newName
-                    );
-
-            }
-
-
-            showToast(
-                "Profile updated successfully!"
-            );
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// CHANGE PASSWORD
-// ============================================================
-
-if (changePasswordButton) {
-
-    changePasswordButton.addEventListener(
-        "click",
-        () => {
-
-            if (passwordChangeError) {
-
-                passwordChangeError.textContent =
-                    "";
-
-            }
-
-
-            const user =
-                getCurrentUser();
-
-
-            if (!user) {
-
-                return;
-
-            }
-
-
-            const oldPassword =
-                currentPassword.value;
-
-
-            const password =
-                newPassword.value;
-
-
-            const confirmPassword =
-                confirmNewPassword.value;
-
-
-            // -----------------------------------------------
-            // CHECK FIELDS
-            // -----------------------------------------------
-
-            if (
-                !oldPassword ||
-                !password ||
-                !confirmPassword
-            ) {
-
-                passwordChangeError.textContent =
-                    "Please fill in all password fields.";
-
-                return;
-
-            }
-
-
-            // -----------------------------------------------
-            // GET ACCOUNT
-            // -----------------------------------------------
-
-            const accounts =
-                getAccounts();
-
-
-            const accountIndex =
-                accounts.findIndex(
-                    account =>
-                        account.id ===
-                        user.id
-                );
-
-
-            if (
-                accountIndex === -1
-            ) {
-
-                passwordChangeError.textContent =
-                    "Account could not be found.";
-
-                return;
-
-            }
-
-
-            const account =
-                accounts[
-                    accountIndex
-                ];
-
-
-            // -----------------------------------------------
-            // VERIFY OLD PASSWORD
-            // -----------------------------------------------
-
-            if (
-                account.password !==
-                oldPassword
-            ) {
-
-                passwordChangeError.textContent =
-                    "Current password is incorrect.";
-
-                return;
-
-            }
-
-
-            // -----------------------------------------------
-            // NEW PASSWORD VALIDATION
-            // -----------------------------------------------
-
-            if (
-                password.length < 6
-            ) {
-
-                passwordChangeError.textContent =
-                    "New password must contain at least 6 characters.";
-
-                return;
-
-            }
-
-
-            if (
-                password !==
-                confirmPassword
-            ) {
-
-                passwordChangeError.textContent =
-                    "New passwords do not match.";
-
-                return;
-
-            }
-
-
-            // -----------------------------------------------
-            // UPDATE PASSWORD
-            // -----------------------------------------------
-
-            account.password =
-                password;
-
-
-            accounts[
-                accountIndex
-            ] =
-                account;
-
-
-            saveAccounts(
-                accounts
-            );
-
-
-            // -----------------------------------------------
-            // CLEAR FIELDS
-            // -----------------------------------------------
-
-            currentPassword.value =
-                "";
-
-            newPassword.value =
-                "";
-
-            confirmNewPassword.value =
-                "";
-
-
-            showToast(
-                "Password changed successfully!"
-            );
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// DELETE ACCOUNT
-// ============================================================
-
-if (deleteAccountButton) {
-
-    deleteAccountButton.addEventListener(
-        "click",
-        () => {
-
-            const user =
-                getCurrentUser();
-
-
-            if (!user) {
-                return;
-            }
-
-
-            const confirmation =
-                confirm(
-                    "Are you sure you want to delete your MovieFlix account?\n\nThis action cannot be undone."
-                );
-
-
-            if (!confirmation) {
-
-                return;
-
-            }
-
-
-            // -----------------------------------------------
-            // REMOVE ACCOUNT
-            // -----------------------------------------------
-
-            const accounts =
-                getAccounts();
-
-
-            const remainingAccounts =
-                accounts.filter(
-                    account =>
-                        account.id !==
-                        user.id
-                );
-
-
-            saveAccounts(
-                remainingAccounts
-            );
-
-
-            // -----------------------------------------------
-            // REMOVE SESSION
-            // -----------------------------------------------
-
-            removeCurrentUser();
-
-
-            // -----------------------------------------------
-            // CLEAR USER LIST
-            // -----------------------------------------------
-
-            localStorage.removeItem(
-                `movieflix-list-${user.id}`
-            );
-
-
-            showToast(
-                "Your account has been deleted."
-            );
-
-
-            setTimeout(
-                () => {
-
-                    closeAccount();
-
-                    showLoginForm();
-
-                    updateAccountButton();
-
-                },
-                700
-            );
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// USER-SPECIFIC MY LIST
-// ============================================================
-
-function getUserListKey() {
-
-    const user =
-        getCurrentUser();
-
-
-    if (!user) {
-        return null;
-    }
-
-
-    return `movieflix-list-${user.id}`;
-
-}
-
-
-// ============================================================
-// GET USER MY LIST
-// ============================================================
-
-function getUserMovieList() {
-
-    const key =
-        getUserListKey();
-
-
-    if (!key) {
-        return [];
-    }
-
-
-    try {
-
-        return JSON.parse(
-            localStorage.getItem(
-                key
-            ) || "[]"
-        );
-
-    } catch (error) {
-
-        return [];
-
-    }
-
-}
-
-
-// ============================================================
-// SAVE USER MY LIST
-// ============================================================
-
-function saveUserMovieList(
-    movies
-) {
-
-    const key =
-        getUserListKey();
-
-
-    if (!key) {
         return;
-    }
-
-
-    localStorage.setItem(
-        key,
-        JSON.stringify(movies)
-    );
-
-}
-
-
-// ============================================================
-// ADD MOVIE TO USER LIST
-// ============================================================
-
-function addMovieToUserList(
-    movie
-) {
-
-    const user =
-        getCurrentUser();
-
-
-    if (!user) {
-
-        showToast(
-            "Please sign in to save movies."
-        );
-
-        return false;
 
     }
 
 
-    const movies =
-        getUserMovieList();
+    const users =
+        getUsers();
 
 
     const exists =
-        movies.some(
-            item =>
-                item.id ===
-                movie.id
+        users.some(
+            user =>
+                user.email ===
+                email
         );
 
 
     if (exists) {
 
-        return false;
-
-    }
-
-
-    movies.push(
-        movie
-    );
-
-
-    saveUserMovieList(
-        movies
-    );
-
-
-    return true;
-
-}
-
-
-// ============================================================
-// REMOVE MOVIE FROM USER LIST
-// ============================================================
-
-function removeMovieFromUserList(
-    movieId
-) {
-
-    const movies =
-        getUserMovieList();
-
-
-    const updatedMovies =
-        movies.filter(
-            movie =>
-                movie.id !==
-                movieId
-        );
-
-
-    saveUserMovieList(
-        updatedMovies
-    );
-
-
-    renderAccountMyList();
-
-}
-
-
-// ============================================================
-// RENDER ACCOUNT MY LIST
-// ============================================================
-
-function renderAccountMyList() {
-
-    if (!accountMyList) {
-        return;
-    }
-
-
-    const movies =
-        getUserMovieList();
-
-
-    accountMyList.innerHTML =
-        "";
-
-
-    // -----------------------------------------------
-    // EMPTY
-    // -----------------------------------------------
-
-    if (!movies.length) {
-
-        accountMyList.classList.add(
-            "hidden"
-        );
-
-
-        if (emptyAccountList) {
-
-            emptyAccountList.classList.remove(
-                "hidden"
-            );
-
-        }
-
+        error.textContent =
+            "An account with this email already exists.";
 
         return;
 
     }
 
 
-    // -----------------------------------------------
-    // HAS MOVIES
-    // -----------------------------------------------
+    /*
+       Educational localStorage authentication.
 
-    accountMyList.classList.remove(
-        "hidden"
-    );
+       For a real production website,
+       passwords must NEVER be stored this way.
+    */
 
+    const user = {
 
-    if (emptyAccountList) {
+        id:
+            Date.now(),
 
-        emptyAccountList.classList.add(
-            "hidden"
-        );
+        name,
 
-    }
+        email,
 
+        password,
 
-    movies.forEach(
-        movie => {
-
-            const card =
-                document.createElement(
-                    "div"
-                );
-
-
-            card.className =
-                "account-list-card";
-
-
-            const poster =
-                movie.poster_path
-                    ? `${IMAGE_BASE_URL}${movie.poster_path}`
-                    : "https://via.placeholder.com/300x450?text=No+Poster";
-
-
-            card.innerHTML = `
-
-                <img
-                    src="${poster}"
-                    alt="${escapeHTML(
-                        movie.title ||
-                        movie.name ||
-                        "Movie"
-                    )}"
-                    loading="lazy"
-                >
-
-                <button
-                    class="account-list-remove"
-                    type="button"
-                    title="Remove from My List"
-                >
-
-                    <i class="fa-solid fa-xmark"></i>
-
-                </button>
-
-            `;
-
-
-            const removeButton =
-                card.querySelector(
-                    ".account-list-remove"
-                );
-
-
-            removeButton.addEventListener(
-                "click",
-                (event) => {
-
-                    event.stopPropagation();
-
-
-                    removeMovieFromUserList(
-                        movie.id
-                    );
-
-
-                    showToast(
-                        "Removed from My List."
-                    );
-
-                }
-            );
-
-
-            card.addEventListener(
-                "click",
-                () => {
-
-                    if (
-                        typeof showMovieDetails ===
-                        "function"
-                    ) {
-
-                        showMovieDetails(
-                            movie
-                        );
-
-                    }
-
-                }
-            );
-
-
-            accountMyList.appendChild(
-                card
-            );
-
-        }
-    );
-
-}
-
-
-// ============================================================
-// WHEN ACCOUNT PAGE OPENS
-// ============================================================
-
-const originalShowAccountPage =
-    showAccountPage;
-
-
-showAccountPage =
-    function(page) {
-
-        originalShowAccountPage(
-            page
-        );
-
-
-        if (
-            page === "profile"
-        ) {
-
-            loadEditProfile();
-
-        }
-
-
-        if (
-            page === "list"
-        ) {
-
-            renderAccountMyList();
-
-        }
+        createdAt:
+            new Date().toISOString()
 
     };
 
 
-// ============================================================
-// INITIALIZE PART 4
-// ============================================================
+    users.push(
+        user
+    );
 
-loadEditProfile();
+
+    saveUsers(
+        users
+    );
+
+
+    const collections =
+        getCollections();
+
+
+    collections[email] = {
+
+        favorite: [],
+
+        watched: [],
+
+        towatch: []
+
+    };
+
+
+    saveCollections(
+        collections
+    );
+
+
+    state.currentUser =
+        user;
+
+
+    saveCurrentUser();
+
+
+    updateAccountUI();
+
+    updateWatchlistCounts();
+
+
+    showToast(
+        "Account created successfully!"
+    );
+
+
+    getElement(
+        "registerFormElement"
+    )?.reset();
+
+}
+
+
+/* ============================================================
+   63. LOGIN
+============================================================ */
+
+function handleLogin(
+    event
+) {
+
+    event.preventDefault();
+
+
+    const email =
+        getElement(
+            "loginEmail"
+        )?.value.trim()
+        .toLowerCase();
+
+
+    const password =
+        getElement(
+            "loginPassword"
+        )?.value;
+
+
+    const error =
+        getElement(
+            "loginError"
+        );
+
+
+    const users =
+        getUsers();
+
+
+    const user =
+        users.find(
+            item =>
+                item.email ===
+                    email &&
+                item.password ===
+                    password
+        );
+
+
+    if (!user) {
+
+        error.textContent =
+            "Incorrect email or password.";
+
+        return;
+
+    }
+
+
+    state.currentUser =
+        user;
+
+
+    saveCurrentUser();
+
+
+    updateAccountUI();
+
+    updateWatchlistCounts();
+
+
+    showToast(
+        `Welcome back, ${user.name}!`
+    );
+
+
+    getElement(
+        "loginFormElement"
+    )?.reset();
+
+}
+
+
+/* ============================================================
+   64. PASSWORD TOGGLE
+============================================================ */
+
+function togglePassword(
+    inputId,
+    button
+) {
+
+    const input =
+        getElement(
+            inputId
+        );
+
+
+    if (!input) {
+
+        return;
+
+    }
+
+
+    const isPassword =
+        input.type ===
+        "password";
+
+
+    input.type =
+        isPassword
+            ? "text"
+            : "password";
+
+
+    const icon =
+        button.querySelector(
+            "i"
+        );
+
+
+    if (icon) {
+
+        icon.className =
+            isPassword
+                ? "fa-solid fa-eye-slash"
+                : "fa-solid fa-eye";
+
+    }
+
+}
+
+
+/* ============================================================
+   65. PROFILE UI
+============================================================ */
+
+function updateProfileUI() {
+
+    if (!state.currentUser) {
+
+        return;
+
+    }
+
+
+    const name =
+        state.currentUser.name;
+
+
+    const email =
+        state.currentUser.email;
+
+
+    const profileName =
+        getElement(
+            "profileName"
+        );
+
+
+    const profileEmail =
+        getElement(
+            "profileEmail"
+        );
+
+
+    const avatar =
+        getElement(
+            "profileAvatar"
+        );
+
+
+    const editName =
+        getElement(
+            "editProfileName"
+        );
+
+
+    if (profileName) {
+
+        profileName.textContent =
+            name;
+
+    }
+
+
+    if (profileEmail) {
+
+        profileEmail.textContent =
+            email;
+
+    }
+
+
+    if (avatar) {
+
+        avatar.textContent =
+            getInitials(
+                name
+            );
+
+    }
+
+
+    if (editName) {
+
+        editName.value =
+            name;
+
+    }
+
+}
+
+
+/* ============================================================
+   66. INITIALS
+============================================================ */
+
+function getInitials(
+    name
+) {
+
+    return name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(
+            word =>
+                word[0]
+                    .toUpperCase()
+        )
+        .join("");
+
+}
+
+
+/* ============================================================
+   67. ACCOUNT PAGE
+============================================================ */
+
+function showAccountPage(
+    page
+) {
+
+    document
+        .querySelectorAll(
+            ".account-page"
+        )
+        .forEach(
+            section => {
+
+                section.classList.add(
+                    "hidden"
+                );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll(
+            ".account-menu-item"
+        )
+        .forEach(
+            button => {
+
+                button.classList.toggle(
+                    "active",
+                    button.dataset.accountPage ===
+                        page
+                );
+
+            }
+        );
+
+
+    const target =
+        getElement(
+            `accountPage${capitalize(
+                page
+            )}`
+        );
+
+
+    target?.classList.remove(
+        "hidden"
+    );
+
+
+    updateWatchlistCounts();
+
+}
+
+
+/* ============================================================
+   68. CAPITALIZE
+============================================================ */
+
+function capitalize(
+    value
+) {
+
+    return value.charAt(0)
+        .toUpperCase() +
+        value.slice(1);
+
+}
+
+
+/* ============================================================
+   69. SAVE PROFILE
+============================================================ */
+
+function saveProfile() {
+
+    if (!state.currentUser) {
+
+        return;
+
+    }
+
+
+    const newName =
+        getElement(
+            "editProfileName"
+        )?.value.trim();
+
+
+    if (!newName) {
+
+        showToast(
+            "Please enter a name."
+        );
+
+        return;
+
+    }
+
+
+    const users =
+        getUsers();
+
+
+    const index =
+        users.findIndex(
+            user =>
+                user.email ===
+                state.currentUser.email
+        );
+
+
+    if (
+        index === -1
+    ) {
+
+        return;
+
+    }
+
+
+    users[index].name =
+        newName;
+
+
+    state.currentUser =
+        users[index];
+
+
+    saveUsers(
+        users
+    );
+
+
+    saveCurrentUser();
+
+
+    updateProfileUI();
+
+
+    updateAccountUI();
+
+
+    showToast(
+        "Profile updated."
+    );
+
+}
+
+
+/* ============================================================
+   70. LOGOUT
+============================================================ */
+
+function logout() {
+
+    state.currentUser =
+        null;
+
+
+    saveCurrentUser();
+
+
+    closeAccountModal();
+
+
+    updateAccountUI();
+
+
+    updateWatchlistCounts();
+
+
+    showToast(
+        "You have been signed out."
+    );
+
+
+    if (
+        state.currentPage ===
+        "watchlist"
+    ) {
+
+        renderWatchlist();
+
+    }
+
+}
+
+
+/* ============================================================
+   71. DELETE ACCOUNT
+============================================================ */
+
+function deleteAccount() {
+
+    if (!state.currentUser) {
+
+        return;
+
+    }
+
+
+    const confirmed =
+        window.confirm(
+            "Are you sure you want to delete your account? This will remove your saved movies and reviews."
+        );
+
+
+    if (!confirmed) {
+
+        return;
+
+    }
+
+
+    const email =
+        state.currentUser.email;
+
+
+    const users =
+        getUsers()
+            .filter(
+                user =>
+                    user.email !==
+                    email
+            );
+
+
+    saveUsers(
+        users
+    );
+
+
+    const collections =
+        getCollections();
+
+
+    delete collections[
+        email
+    ];
+
+
+    saveCollections(
+        collections
+    );
+
+
+    const reviews =
+        getReviews();
+
+
+    delete reviews[
+        email
+    ];
+
+
+    saveReviews(
+        reviews
+    );
+
+
+    state.currentUser =
+        null;
+
+
+    saveCurrentUser();
+
+
+    updateAccountUI();
+
+    updateWatchlistCounts();
+
+
+    closeAccountModal();
+
+
+    showToast(
+        "Account deleted."
+    );
+
+
+    if (
+        state.currentPage ===
+        "watchlist"
+    ) {
+
+        renderWatchlist();
+
+    }
+
+}
+
+
+/* ============================================================
+   72. REVIEW STORAGE
+============================================================ */
+
+function getMovieReviews(
+    movieId
+) {
+
+    const reviews =
+        getReviews();
+
+
+    return (
+        reviews[
+            String(movieId)
+        ] || []
+    );
+
+}
+
+
+/* ============================================================
+   73. SAVE MOVIE REVIEWS
+============================================================ */
+
+function saveMovieReviews(
+    movieId,
+    movieReviews
+) {
+
+    const reviews =
+        getReviews();
+
+
+    reviews[
+        String(movieId)
+    ] =
+        movieReviews;
+
+
+    saveReviews(
+        reviews
+    );
+
+}
+
+
+/* ============================================================
+   74. RENDER REVIEW FORM
+============================================================ */
+
+function renderReviewForm() {
+
+    const container =
+        getElement(
+            "reviewFormContainer"
+        );
+
+
+    if (!container) {
+
+        return;
+
+    }
+
+
+    if (!state.currentUser) {
+
+        container.innerHTML = `
+
+            <div class="login-review-message">
+
+                <p
+                    style="
+                        color:#aaa;
+                        margin-bottom:12px;
+                    "
+                >
+                    Sign in to write a review.
+                </p>
+
+
+                <button
+                    class="secondary-button"
+                    type="button"
+                    id="reviewLoginButton"
+                >
+
+                    Sign In
+
+                </button>
+
+            </div>
+
+        `;
+
+
+        getElement(
+            "reviewLoginButton"
+        )?.addEventListener(
+            "click",
+            () => {
+
+                openAccountModal();
+
+            }
+        );
+
+
+        return;
+
+    }
+
+
+    const existingReview =
+        findCurrentUserReview();
+
+
+    state.currentReviewRating =
+        existingReview
+            ? existingReview.rating
+            : 0;
+
+
+    container.innerHTML = `
+
+        <form
+            class="review-form"
+            id="reviewForm"
+        >
+
+            <h4>
+                ${
+                    existingReview
+                        ? "Edit your review"
+                        : "Write a review"
+                }
+            </h4>
+
+
+            <div
+                class="review-rating-selector"
+            >
+
+                <span>
+                    Your rating:
+                </span>
+
+
+                <div
+                    class="review-stars"
+                    id="reviewStars"
+                >
+
+                    ${createReviewStars()}
+
+                </div>
+
+            </div>
+
+
+            <textarea
+                class="review-textarea"
+                id="reviewText"
+                maxlength="1000"
+                placeholder="What did you think about this movie?"
+                required
+            >${
+                existingReview
+                    ? escapeHTML(
+                        existingReview.text
+                    )
+                    : ""
+            }</textarea>
+
+
+            <div
+                class="review-form-footer"
+            >
+
+                <span
+                    class="review-count"
+                    id="reviewCharacterCount"
+                >
+                    0 / 1000
+                </span>
+
+
+                <button
+                    class="auth-submit"
+                    type="submit"
+                    style="
+                        width:auto;
+                        padding:0 18px;
+                    "
+                >
+
+                    ${
+                        existingReview
+                            ? "Update Review"
+                            : "Publish Review"
+                    }
+
+                </button>
+
+            </div>
+
+        </form>
+
+    `;
+
+
+    setupReviewForm();
+
+}
+
+
+/* ============================================================
+   75. CREATE REVIEW STARS
+============================================================ */
+
+function createReviewStars() {
+
+    return [1, 2, 3, 4, 5]
+        .map(
+            number =>
+                `
+                <button
+                    class="review-star ${
+                        number <=
+                        state.currentReviewRating
+                            ? "active"
+                            : ""
+                    }"
+                    type="button"
+                    data-rating="${number}"
+                    aria-label="${number} stars"
+                >
+                    <i
+                        class="fa-solid fa-star"
+                    ></i>
+                </button>
+                `
+        )
+        .join("");
+
+}
+
+
+/* ============================================================
+   76. REVIEW FORM EVENTS
+============================================================ */
+
+function setupReviewForm() {
+
+    const form =
+        getElement(
+            "reviewForm"
+        );
+
+
+    const textarea =
+        getElement(
+            "reviewText"
+        );
+
+
+    const counter =
+        getElement(
+            "reviewCharacterCount"
+        );
+
+
+    document
+        .querySelectorAll(
+            ".review-star"
+        )
+        .forEach(
+            star => {
+
+                star.addEventListener(
+                    "click",
+                    () => {
+
+                        state.currentReviewRating =
+                            Number(
+                                star.dataset.rating
+                            );
+
+
+                        document
+                            .querySelectorAll(
+                                ".review-star"
+                            )
+                            .forEach(
+                                item => {
+
+                                    item.classList.toggle(
+                                        "active",
+                                        Number(
+                                            item.dataset.rating
+                                        ) <=
+                                            state.currentReviewRating
+                                    );
+
+                                }
+                            );
+
+                    }
+                );
+
+            }
+        );
+
+
+    textarea?.addEventListener(
+        "input",
+        () => {
+
+            if (counter) {
+
+                counter.textContent =
+                    `${textarea.value.length} / 1000`;
+
+            }
+
+        }
+    );
+
+
+    if (textarea && counter) {
+
+        counter.textContent =
+            `${textarea.value.length} / 1000`;
+
+    }
+
+
+    form?.addEventListener(
+        "submit",
+        handleReviewSubmit
+    );
+
+}
+
+
+/* ============================================================
+   77. FIND CURRENT USER REVIEW
+============================================================ */
+
+function findCurrentUserReview() {
+
+    if (
+        !state.currentUser ||
+        !state.currentMovie
+    ) {
+
+        return null;
+
+    }
+
+
+    const reviews =
+        getMovieReviews(
+            state.currentMovie.id
+        );
+
+
+    return (
+        reviews.find(
+            review =>
+                review.userEmail ===
+                state.currentUser.email
+        ) ||
+        null
+    );
+
+}
+
+
+/* ============================================================
+   78. REVIEW SUBMIT
+============================================================ */
+
+function handleReviewSubmit(
+    event
+) {
+
+    event.preventDefault();
+
+
+    if (
+        !state.currentUser ||
+        !state.currentMovie
+    ) {
+
+        return;
+
+    }
+
+
+    const textarea =
+        getElement(
+            "reviewText"
+        );
+
+
+    const text =
+        textarea?.value.trim();
+
+
+    if (
+        state.currentReviewRating <
+        1
+    ) {
+
+        showToast(
+            "Please select a rating."
+        );
+
+        return;
+
+    }
+
+
+    if (!text) {
+
+        showToast(
+            "Please write something in your review."
+        );
+
+        return;
+
+    }
+
+
+    const movie =
+        state.currentMovie;
+
+
+    const reviews =
+        getMovieReviews(
+            movie.id
+        );
+
+
+    const existingIndex =
+        reviews.findIndex(
+            review =>
+                review.userEmail ===
+                state.currentUser.email
+        );
+
+
+    const review = {
+
+        id:
+            existingIndex >= 0
+                ? reviews[
+                    existingIndex
+                ].id
+                : Date.now(),
+
+        movieId:
+            movie.id,
+
+        userEmail:
+            state.currentUser.email,
+
+        userName:
+            state.currentUser.name,
+
+        rating:
+            state.currentReviewRating,
+
+        text,
+
+        updatedAt:
+            new Date().toISOString()
+
+    };
+
+
+    if (
+        existingIndex >= 0
+    ) {
+
+        reviews[
+            existingIndex
+        ] =
+            review;
+
+        showToast(
+            "Review updated."
+        );
+
+    } else {
+
+        review.createdAt =
+            new Date().toISOString();
+
+
+        reviews.push(
+            review
+        );
+
+
+        showToast(
+            "Review published."
+        );
+
+    }
+
+
+    saveMovieReviews(
+        movie.id,
+        reviews
+    );
+
+
+    renderReviewForm();
+
+    renderReviews(
+        movie.id
+    );
+
+    updateWatchlistCounts();
+
+}
+
+
+/* ============================================================
+   79. RENDER REVIEWS
+============================================================ */
+
+function renderReviews(
+    movieId
+) {
+
+    const container =
+        getElement(
+            "reviewsList"
+        );
+
+
+    if (!container) {
+
+        return;
+
+    }
+
+
+    const reviews =
+        getMovieReviews(
+            movieId
+        );
+
+
+    if (!reviews.length) {
+
+        container.innerHTML = `
+
+            <div
+                style="
+                    padding:20px;
+                    text-align:center;
+                    color:#777;
+                    background:rgba(255,255,255,.03);
+                    border-radius:8px;
+                "
+            >
+
+                No reviews yet.
+                Be the first to review this movie!
+
+            </div>
+
+        `;
+
+        return;
+
+    }
+
+
+    const sortedReviews =
+        [...reviews].sort(
+            (
+                a,
+                b
+            ) =>
+                new Date(
+                    b.updatedAt ||
+                    b.createdAt
+                ) -
+                new Date(
+                    a.updatedAt ||
+                    a.createdAt
+                )
+        );
+
+
+    container.innerHTML =
+        sortedReviews
+            .map(
+                review =>
+                    createReviewCard(
+                        review
+                    )
+            )
+            .join("");
+
+
+    attachReviewEvents(
+        container
+    );
+
+}
+
+
+/* ============================================================
+   80. REVIEW CARD
+============================================================ */
+
+function createReviewCard(
+    review
+) {
+
+    const isOwner =
+        state.currentUser &&
+        review.userEmail ===
+            state.currentUser.email;
+
+
+    const stars =
+        "★".repeat(
+            review.rating
+        ) +
+        "☆".repeat(
+            5 - review.rating
+        );
+
+
+    const date =
+        formatDate(
+            review.updatedAt ||
+            review.createdAt
+        );
+
+
+    return `
+
+        <article
+            class="review-card"
+            data-review-id="${review.id}"
+        >
+
+            <div class="review-header">
+
+                <div class="review-user">
+
+                    <div class="review-avatar">
+
+                        ${escapeHTML(
+                            getInitials(
+                                review.userName
+                            )
+                        )}
+
+                    </div>
+
+
+                    <div class="review-user-info">
+
+                        <strong>
+                            ${escapeHTML(
+                                review.userName
+                            )}
+                        </strong>
+
+
+                        <small>
+                            ${date}
+                        </small>
+
+                    </div>
+
+                </div>
+
+
+                <div class="review-rating">
+
+                    ${stars}
+
+                </div>
+
+            </div>
+
+
+            <p class="review-body">
+
+                ${escapeHTML(
+                    review.text
+                )}
+
+            </p>
+
+
+            ${
+                isOwner
+                    ? `
+
+                        <div class="review-actions">
+
+                            <button
+                                class="review-action edit-review"
+                                type="button"
+                                data-review-id="${review.id}"
+                            >
+
+                                <i
+                                    class="fa-solid fa-pen"
+                                ></i>
+
+                                Edit
+
+                            </button>
+
+
+                            <button
+                                class="review-action delete delete-review"
+                                type="button"
+                                data-review-id="${review.id}"
+                            >
+
+                                <i
+                                    class="fa-solid fa-trash"
+                                ></i>
+
+                                Delete
+
+                            </button>
+
+                        </div>
+
+                      `
+                    : ""
+            }
+
+        </article>
+
+    `;
+
+}
+
+
+/* ============================================================
+   81. REVIEW EVENTS
+============================================================ */
+
+function attachReviewEvents(
+    container
+) {
+
+    container
+        .querySelectorAll(
+            ".edit-review"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        const review =
+                            findReviewById(
+                                button.dataset.reviewId
+                            );
+
+
+                        if (!review) {
+
+                            return;
+
+                        }
+
+
+                        state.currentReviewRating =
+                            review.rating;
+
+
+                        renderReviewForm();
+
+
+                        getElement(
+                            "reviewText"
+                        )?.focus();
+
+
+                        getElement(
+                            "reviewForm"
+                        )?.scrollIntoView({
+                            behavior:
+                                "smooth",
+                            block:
+                                "center"
+                        });
+
+                    }
+                );
+
+            }
+        );
+
+
+    container
+        .querySelectorAll(
+            ".delete-review"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        deleteReview(
+                            button.dataset.reviewId
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+}
+
+
+/* ============================================================
+   82. FIND REVIEW
+============================================================ */
+
+function findReviewById(
+    reviewId
+) {
+
+    if (!state.currentMovie) {
+
+        return null;
+
+    }
+
+
+    const reviews =
+        getMovieReviews(
+            state.currentMovie.id
+        );
+
+
+    return (
+        reviews.find(
+            review =>
+                String(review.id) ===
+                String(reviewId)
+        ) ||
+        null
+    );
+
+}
+
+
+/* ============================================================
+   83. DELETE REVIEW
+============================================================ */
+
+function deleteReview(
+    reviewId
+) {
+
+    if (
+        !state.currentMovie ||
+        !state.currentUser
+    ) {
+
+        return;
+
+    }
+
+
+    const confirmed =
+        window.confirm(
+            "Delete your review?"
+        );
+
+
+    if (!confirmed) {
+
+        return;
+
+    }
+
+
+    let reviews =
+        getMovieReviews(
+            state.currentMovie.id
+        );
+
+
+    reviews =
+        reviews.filter(
+            review =>
+                !(
+                    String(review.id) ===
+                        String(reviewId) &&
+                    review.userEmail ===
+                        state.currentUser.email
+                )
+        );
+
+
+    saveMovieReviews(
+        state.currentMovie.id,
+        reviews
+    );
+
+
+    state.currentReviewRating =
+        0;
+
+
+    renderReviewForm();
+
+    renderReviews(
+        state.currentMovie.id
+    );
+
+    updateWatchlistCounts();
+
+
+    showToast(
+        "Review deleted."
+    );
+
+}
+
+
+/* ============================================================
+   84. CURRENT USER REVIEW COUNT
+============================================================ */
+
+function getCurrentUserReviewCount() {
+
+    if (!state.currentUser) {
+
+        return 0;
+
+    }
+
+
+    const allReviews =
+        getReviews();
+
+
+    let count = 0;
+
+
+    Object.values(
+        allReviews
+    )
+        .forEach(
+            movieReviews => {
+
+                if (
+                    Array.isArray(
+                        movieReviews
+                    )
+                ) {
+
+                    count +=
+                        movieReviews.filter(
+                            review =>
+                                review.userEmail ===
+                                state.currentUser.email
+                        ).length;
+
+                }
+
+            }
+        );
+
+
+    return count;
+
+}
+
+
+/* ============================================================
+   85. GLOBAL SAFETY
+============================================================ */
+
+/*
+   These are exposed globally because some browser
+   interactions and dynamically generated elements may
+   need access to them.
+*/
+
+window.openMovieDetails =
+    openMovieDetails;
+
+window.closeMovieModal =
+    closeMovieModal;
+
+window.openAccountModal =
+    openAccountModal;
+
+window.closeAccountModal =
+    closeAccountModal;
+
+
+/* ============================================================
+   86. FINAL DEBUG MESSAGE
+============================================================ */
+
+console.log(
+    "MovieFlix initialized successfully."
+);
