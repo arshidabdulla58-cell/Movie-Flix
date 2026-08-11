@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+```
+<title>MovieFlix</title>
+
+<meta
+    name="description"
+    content="MovieFlix - Discover movies, trending films and popular entertainment."
+>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+>
+
+<link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+>
+
+<link rel="stylesheet" href="style.css">
+```
+
+</head>
+
+<body>
+
+```
+<!-- ================= HEADER ================= -->
+
+<header class="header">
+
+    <div class="logo">
+        <span>Movie</span>Flix
+    </div>
+
+    <nav class="nav">
+        <a href="#home" class="nav-link active">Home</a>
+        <a href="#movies" class="nav-link">Movies</a>
+        <a href="#trending" class="nav-link">Trending</a>
+        <a href="#my-list" class="nav-link">My List</a>
+    </nav>
+
+    <div class="header-right">
+
+        <button class="search-button" id="searchButton">
+            <i class="fa-solid fa-magnifying-glass"></i>
+        </button>
+
+        <div class="search-box" id="searchBox">
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search movies..."
+                autocomplete="off"
+            >
+            <button id="closeSearch">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+      
+<!-- ACCOUNT BUTTON -->
+<button
+    class="account-button"
+    id="accountButton"
+    type="button"
+    title="Account"
+>
+    <i class="fa-solid fa-user"></i>
+    <span>Account</span>
+</button>
+    </div>
+
+</header>
+
+
+<!-- ================= HERO ================= -->
+
+<main>
+
+    <section class="hero" id="home">
+
+        <div class="hero-content">
+
+            <span class="hero-label">
+                <i class="fa-solid fa-fire"></i>
+                #1 Trending Today
+            </span>
+
+            <h1 id="heroTitle">
+                Loading...
+            </h1>
+
+            <div class="hero-meta">
+                <span id="heroYear">2026</span>
+                <span class="dot">•</span>
+                <span id="heroRating">⭐ 8.5</span>
+                <span class="dot">•</span>
+                <span>Movie</span>
+            </div>
+
+            <p id="heroDescription">
+                Discover amazing movies and explore your next favorite film.
+            </p>
+
+            <div class="hero-buttons">
+
+                <button class="btn btn-primary" id="heroPlay">
+                    <i class="fa-solid fa-play"></i>
+                    Play
+                </button>
+
+                <button class="btn btn-secondary" id="heroInfo">
+                    <i class="fa-solid fa-circle-info"></i>
+                    More Info
+                </button>
+
+            </div>
+
+        </div>
+
+        <div class="hero-overlay"></div>
+
+    </section>
+
+
+    <!-- ================= SEARCH RESULTS ================= -->
+
+    <section class="section search-results-section hidden" id="searchResultsSection">
+
+        <div class="section-header">
+            <h2>
+                Search results for
+                <span id="searchQuery"></span>
+            </h2>
+        </div>
+
+        <div class="movie-grid" id="searchResults"></div>
+
+    </section>
+
+
+    <!-- ================= TRENDING ================= -->
+
+    <section class="section" id="trending">
+
+        <div class="section-header">
+
+            <h2>
+                <span class="red-line"></span>
+                Trending Now
+            </h2>
+
+            <button class="see-all" data-section="trending">
+                See All
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+
+        </div>
+
+        <div class="movie-row" id="trendingMovies"></div>
+
+    </section>
+
+
+    <!-- ================= POPULAR ================= -->
+
+    <section class="section" id="movies">
+
+        <div class="section-header">
+
+            <h2>
+                <span class="red-line"></span>
+                Popular Movies
+            </h2>
+
+            <button class="see-all" data-section="popular">
+                See All
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+
+        </div>
+
+        <div class="movie-row" id="popularMovies"></div>
+
+    </section>
+
+
+    <!-- ================= TOP RATED ================= -->
+
+    <section class="section">
+
+        <div class="section-header">
+
+            <h2>
+                <span class="red-line"></span>
+                Top Rated
+            </h2>
+
+        </div>
+
+        <div class="movie-row" id="topRatedMovies"></div>
+
+    </section>
+
+
+    <!-- ================= ACTION ================= -->
+
+    <section class="section">
+
+        <div class="section-header">
+
+            <h2>
+                <span class="red-line"></span>
+                Action Movies
+            </h2>
+
+        </div>
+
+        <div class="movie-row" id="actionMovies"></div>
+
+    </section>
+
+
+    <!-- ================= MY LIST ================= -->
+
+    <section class="section" id="my-list">
+
+        <div class="section-header">
+
+            <h2>
+                <span class="red-line"></span>
+                My List
+            </h2>
+
+        </div>
+
+        <div class="movie-row" id="myListMovies"></div>
+
+        <p class="empty-message" id="emptyList">
+            Your list is empty. Add movies by clicking the ❤️ button.
+        </p>
+
+    </section>
+
+</main>
+
+
+<!-- ================= MOVIE MODAL ================= -->
+
+<div class="modal" id="movieModal">
+
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+
+    <div class="modal-content">
+
+        <button class="modal-close" id="modalClose">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div class="modal-image" id="modalImage"></div>
+
+        <div class="modal-body">
+
+            <h2 id="modalTitle">
+                Movie Title
+            </h2>
+
+            <div class="modal-meta">
+
+                <span id="modalYear">
+                    2026
+                </span>
+
+                <span>•</span>
+
+                <span id="modalRating">
+                    ⭐ 8.5
+                </span>
+
+                <span>•</span>
+
+                <span id="modalRuntime">
+                    120 min
+                </span>
+
+            </div>
+
+            <div class="modal-genres" id="modalGenres"></div>
+
+            <p id="modalDescription">
+                Movie description.
+            </p>
+
+            <div class="modal-actions">
+
+                <button class="btn btn-primary" id="modalTrailer">
+                    <i class="fa-brands fa-youtube"></i>
+                    Trailer
+                </button>
+
+                <button class="btn btn-secondary" id="modalList">
+                    <i class="fa-solid fa-plus"></i>
+                    My List
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- ================= LOADING ================= -->
+
+<div class="loading-screen" id="loadingScreen">
+
+    <div class="loader"></div>
+
+    <p>Loading MovieFlix...</p>
+
+</div>
+
+
+<!-- ================= TOAST ================= -->
+
+<div class="toast" id="toast">
+    Movie added to your list.
+</div>
+
+
+<footer class="footer">
+
+    <div class="footer-logo">
+        MovieFlix
+    </div>
+
+    <p>
+        This product uses the TMDB API but is not endorsed or certified by TMDB.
+    </p>
+
+    <p>
+        © 2026 MovieFlix. Educational project.
+    </p>
+
+</footer>
+
+
+
+```
+<!-- =====================================================
+     ACCOUNT MODAL
+===================================================== -->
+
+<div
+    class="account-overlay"
+    id="accountOverlay"
+>
+
+    <div
+        class="account-modal"
+        id="accountModal"
+    >
+
+        <!-- CLOSE BUTTON -->
+
+        <button
+            class="account-close"
+            id="accountClose"
+            type="button"
+            aria-label="Close account"
+        >
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+
+        <!-- =================================================
+             LOGIN / REGISTER
+        ================================================== -->
+
+        <div
+            class="account-auth"
+            id="accountAuth"
+        >
+
+            <!-- LOGIN -->
+
+            <div
+                class="auth-form"
+                id="loginForm"
+            >
+
+                <div class="account-logo">
+                    <i class="fa-solid fa-film"></i>
+                    <span>Movie<span>Flix</span></span>
+                </div>
+
+                <h2>Welcome Back</h2>
+
+                <p class="account-subtitle">
+                    Sign in to continue watching.
+                </p>
+
+
+                <form id="loginFormElement">
+
+                    <div class="input-group">
+
+                        <i class="fa-solid fa-envelope"></i>
+
+                        <input
+                            type="email"
+                            id="loginEmail"
+                            placeholder="Email address"
+                            autocomplete="email"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="input-group">
+
+                        <i class="fa-solid fa-lock"></i>
+
+                        <input
+                            type="password"
+                            id="loginPassword"
+                            placeholder="Password"
+                            autocomplete="current-password"
+                            required
+                        >
+
+                        <button
+                            type="button"
+                            class="password-toggle"
+                            data-target="loginPassword"
+                        >
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+
+                    </div>
+
+
+                    <p
+                        class="auth-error"
+                        id="loginError"
+                    ></p>
+
+
+                    <button
+                        class="auth-submit"
+                        type="submit"
+                    >
+                        Sign In
+                    </button>
+
+                </form>
+
+
+                <p class="auth-switch">
+
+                    New to MovieFlix?
+
+                    <button
+                        type="button"
+                        id="showRegister"
+                    >
+                        Create an account
+                    </button>
+
+                </p>
+
+            </div>
+
+
+            <!-- REGISTER -->
+
+            <div
+                class="auth-form hidden"
+                id="registerForm"
+            >
+
+                <div class="account-logo">
+                    <i class="fa-solid fa-film"></i>
+                    <span>Movie<span>Flix</span></span>
+                </div>
+
+                <h2>Create Account</h2>
+
+                <p class="account-subtitle">
+                    Join MovieFlix for free.
+                </p>
+
+
+                <form id="registerFormElement">
+
+                    <div class="input-group">
+
+                        <i class="fa-solid fa-user"></i>
+
+                        <input
+                            type="text"
+                            id="registerName"
+                            placeholder="Your name"
+                            autocomplete="name"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="input-group">
+
+                        <i class="fa-solid fa-envelope"></i>
+
+                        <input
+                            type="email"
+                            id="registerEmail"
+                            placeholder="Email address"
+                            autocomplete="email"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="input-group">
+
+                        <i class="fa-solid fa-lock"></i>
+
+                        <input
+                            type="password"
+                            id="registerPassword"
+                            placeholder="Create password"
+                            autocomplete="new-password"
+                            minlength="6"
+                            required
+                        >
+
+                        <button
+                            type="button"
+                            class="password-toggle"
+                            data-target="registerPassword"
+                        >
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+
+                    </div>
+
+
+                    <p
+                        class="auth-error"
+                        id="registerError"
+                    ></p>
+
+
+                    <button
+                        class="auth-submit"
+                        type="submit"
+                    >
+                        Create Account
+                    </button>
+
+                </form>
+
+
+                <p class="auth-switch">
+
+                    Already have an account?
+
+                    <button
+                        type="button"
+                        id="showLogin"
+                    >
+                        Sign in
+                    </button>
+
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             USER ACCOUNT DASHBOARD
+        ================================================== -->
+
+        <div
+            class="account-dashboard hidden"
+            id="accountDashboard"
+        >
+
+            <!-- PROFILE HEADER -->
+
+            <div class="profile-header">
+
+                <div
+                    class="profile-avatar"
+                    id="profileAvatar"
+                >
+                    U
+                </div>
+
+
+                <div class="profile-info">
+
+                    <h2 id="profileName">
+                        User
+                    </h2>
+
+                    <p id="profileEmail">
+                        user@example.com
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <!-- ACCOUNT MENU -->
+
+            <div class="account-menu">
+
+                <button
+                    class="account-menu-item active"
+                    data-account-page="profile"
+                >
+
+                    <i class="fa-solid fa-user"></i>
+
+                    <div>
+                        <strong>Profile</strong>
+                        <small>
+                            Manage your profile
+                        </small>
+                    </div>
+
+                    <i class="fa-solid fa-chevron-right"></i>
+
+                </button>
+
+
+                <button
+                    class="account-menu-item"
+                    data-account-page="settings"
+                >
+
+                    <i class="fa-solid fa-gear"></i>
+
+                    <div>
+                        <strong>Settings</strong>
+                        <small>
+                            Account preferences
+                        </small>
+                    </div>
+
+                    <i class="fa-solid fa-chevron-right"></i>
+
+                </button>
+
+
+                <button
+                    class="account-menu-item"
+                    data-account-page="list"
+                >
+
+                    <i class="fa-solid fa-heart"></i>
+
+                    <div>
+                        <strong>My List</strong>
+                        <small>
+                            Your saved movies
+                        </small>
+                    </div>
+
+                    <i class="fa-solid fa-chevron-right"></i>
+
+                </button>
+
+            </div>
+
+
+            <!-- PROFILE PAGE -->
+
+  <div
+    class="account-page"
+    id="accountPageProfile"
+>
+
+    <h3>Profile</h3>
+
+    <!-- PROFILE EDIT -->
+
+    <div class="profile-edit-section">
+
+        <div class="profile-edit-avatar">
+            <span id="editProfileAvatar">U</span>
+        </div>
+
+        <div class="profile-edit-info">
+
+            <label for="editProfileName">
+                Display Name
+            </label>
+
+            <input
+                type="text"
+                id="editProfileName"
+                placeholder="Your name"
+                maxlength="30"
+            >
+
+        </div>
+
+    </div>
+
+
+    <button
+        class="save-profile-button"
+        id="saveProfileButton"
+        type="button"
+    >
+
+        <i class="fa-solid fa-check"></i>
+
+        Save Profile
+
+    </button>
+
+
+    <!-- PROFILE DETAILS -->
+
+    <div class="profile-detail">
+
+        <span>Name</span>
+
+        <strong
+            id="dashboardName"
+        >
+            User
+        </strong>
+
+    </div>
+
+
+    <div class="profile-detail">
+
+        <span>Email</span>
+
+        <strong
+            id="dashboardEmail"
+        >
+            user@example.com
+        </strong>
+
+    </div>
+
+
+    <!-- CHANGE PASSWORD -->
+
+    <div class="change-password-section">
+
+        <h4>Change Password</h4>
+
+        <div class="input-group">
+
+            <i class="fa-solid fa-lock"></i>
+
+            <input
+                type="password"
+                id="currentPassword"
+                placeholder="Current password"
+            >
+
+        </div>
+
+
+        <div class="input-group">
+
+            <i class="fa-solid fa-key"></i>
+
+            <input
+                type="password"
+                id="newPassword"
+                placeholder="New password"
+            >
+
+        </div>
+
+
+        <div class="input-group">
+
+            <i class="fa-solid fa-key"></i>
+
+            <input
+                type="password"
+                id="confirmNewPassword"
+                placeholder="Confirm new password"
+            >
+
+        </div>
+
+
+        <p
+            class="auth-error"
+            id="passwordChangeError"
+        ></p>
+
+
+        <button
+            class="change-password-button"
+            id="changePasswordButton"
+            type="button"
+        >
+
+            <i class="fa-solid fa-key"></i>
+
+            Update Password
+
+        </button>
+
+    </div>
+
+
+    <!-- LOGOUT -->
+
+    <button
+        class="logout-button"
+        id="logoutButton"
+        type="button"
+    >
+
+        <i class="fa-solid fa-right-from-bracket"></i>
+
+        Sign Out
+
+    </button>
+
+
+    <!-- DELETE ACCOUNT -->
+
+    <button
+        class="delete-account-button"
+        id="deleteAccountButton"
+        type="button"
+    >
+
+        <i class="fa-solid fa-trash"></i>
+
+        Delete Account
+
+    </button>
+
+</div>
+
+
+            <!-- SETTINGS PAGE -->
+
+            <div
+                class="account-page hidden"
+                id="accountPageSettings"
+            >
+
+                <h3>Settings</h3>
+
+
+                <div class="setting-row">
+
+                    <div>
+
+                        <strong>
+                            Autoplay Trailers
+                        </strong>
+
+                        <small>
+                            Play trailers automatically
+                        </small>
+
+                    </div>
+
+                    <label class="switch">
+
+                        <input
+                            type="checkbox"
+                            id="autoplaySetting"
+                        >
+
+                        <span class="slider"></span>
+
+                    </label>
+
+                </div>
+
+
+                <div class="setting-row">
+
+                    <div>
+
+                        <strong>
+                            Notifications
+                        </strong>
+
+                        <small>
+                            Receive MovieFlix updates
+                        </small>
+
+                    </div>
+
+                    <label class="switch">
+
+                        <input
+                            type="checkbox"
+                            id="notificationSetting"
+                            checked
+                        >
+
+                        <span class="slider"></span>
+
+                    </label>
+
+                </div>
+
+            </div>
+
+
+            <!-- MY LIST PAGE -->
+
+          <div
+    class="account-page hidden"
+    id="accountPageList"
+>
+
+    <h3>My List</h3>
+
+    <p
+        class="my-list-account-description"
+    >
+        Movies you've saved to your personal list.
+    </p>
+
+
+    <div
+        class="account-my-list"
+        id="accountMyList"
+    >
+
+        <!-- Movies will be inserted here -->
+
+    </div>
+
+
+    <div
+        class="empty-account-list"
+        id="emptyAccountList"
+    >
+
+        <i class="fa-regular fa-heart"></i>
+
+        <h4>Your list is empty</h4>
+
+        <p>
+            Add movies to My List and they'll
+            appear here.
+        </p>
+
+    </div>
+
+
+    <button
+        class="go-list-button"
+        id="goToMyList"
+        type="button"
+    >
+
+        <i class="fa-solid fa-heart"></i>
+
+        Browse My List
+
+    </button>
+
+</div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
